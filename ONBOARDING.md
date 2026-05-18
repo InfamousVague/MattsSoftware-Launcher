@@ -107,14 +107,26 @@ make notarize                 # notarize+staple an existing build
   also have a `post-build.sh` (hardened-runtime re-sign + rebuild
   DMG).
 - **Blip**: `.github/workflows/release.yml` exists but **CI builds
-  fail** (§6.10) — Blip is released **locally**: `cd Blip && make all`
-  (build NE + Tauri, sign, notarize, install), then
-  `gh release create v<ver> <dmg> --latest`. `make local-release`
-  does bump+all+tag+push+release in one shot but **double-bumps** if
-  you already tagged via `make release` — prefer `make all` + manual
-  `gh release create` for an already-tagged version. Blip commits
-  its prebuilt NE binaries (`src-tauri/resources/blip-ne-*`,
-  `libblip_ne_bridge.dylib`, the `.systemextension`) — intentional.
+  fail** (§6.10) — Blip is released **locally**. Verified working
+  recipe (for an already-tagged version, no double-bump):
+  ```sh
+  cd ~/Development/Apps/Blip
+  npm ci                                  # node_modules is NOT kept around
+  cp package.json /tmp/p.bak
+  npm pkg set scripts.build="vite build"  # skip tsc — it errors on Libs/base
+  make all                                # build NE+Tauri, sign, notarize, install
+  cp /tmp/p.bak package.json              # restore (build script back to tsc -b && vite build)
+  gh release create v<ver> \
+    src-tauri/target/release/bundle/dmg/Blip_<ver>_aarch64.dmg \
+    --repo InfamousVague/Blip --title "Blip v<ver>" \
+    --notes "Signed and notarized macOS release." --latest
+  ```
+  `make release` only bumps/tags/pushes (CI then fails — don't rely
+  on it). `make local-release` does bump+all+tag+push+release but
+  **double-bumps** if you already `make release`'d, and still needs
+  the npm-ci + skip-tsc prep above. Blip commits its prebuilt NE
+  binaries (`src-tauri/resources/blip-ne-*`, `libblip_ne_bridge.dylib`,
+  the `.systemextension`) — intentional.
 - **Libre**: `.github/workflows/desktop-build.yml` — matrix builds
   Linux/Windows on tag push; a dedicated **`macos-release`** job
   (added in this effort) builds + Developer-ID signs + runs
@@ -197,7 +209,11 @@ SwiftUI menu-bar app: `Bootstrap` entry → `MattsSoftwareMenuBarApp`
     for `app`"). Both v0.4.6 and v0.4.7 CI runs failed this way; the
     shipped dmgs came from local builds. Always release Blip locally
     (the resources live on the maintainer's machine). Don't "fix" CI
-    by committing 370MB of tiles.
+    by committing 370MB of tiles. The local build also needs two
+    prep steps every time (Blip's `node_modules` isn't kept; `tsc -b`
+    errors on the `Libs/base` library source): `npm ci` then
+    `npm pkg set scripts.build="vite build"` before `make all`, and
+    restore `package.json` after. Full recipe in §4.
 
 ---
 
