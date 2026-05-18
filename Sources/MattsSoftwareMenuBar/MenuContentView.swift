@@ -112,6 +112,7 @@ struct MenuContentView: View {
                     }
                 }
             }
+            .glassScrollers()
         }
         .frame(maxHeight: .infinity)
     }
