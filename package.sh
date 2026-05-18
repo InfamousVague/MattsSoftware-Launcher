@@ -22,6 +22,11 @@ BIN_NAME="MattsSoftwareMenuBar"
 BUNDLE_ID="com.mattssoftware.launcher"
 RES_BUNDLE="MattsSoftwareMenuBar_MattsSoftwareMenuBar.bundle"
 VERSION="$(tr -d ' \n' < VERSION 2>/dev/null || echo "0.1.0")"
+# Developer ID so the launcher can be notarized like the rest of
+# the menu-bar suite. Override with SIGN_IDENTITY=- for a purely
+# local ad-hoc build (no notarization possible in that mode).
+SIGN_IDENTITY="${SIGN_IDENTITY:-0948896DC970503ADEF5B5070E0BB3E9D9047757}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-Notary}"
 
 echo "▸ Building release binary…"
 swift build -c release
@@ -70,18 +75,35 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# Ad-hoc sign so Gatekeeper lets it run locally without a
-# quarantine nag (no Developer ID needed for a personal app).
+# Sign with the Developer ID + hardened runtime + secure timestamp
+# so the bundle is notarizable (ad-hoc apps cannot be notarized).
 # Order matters: strip xattr detritus first (cp leaves Finder attrs
-# that codesign rejects), then ONE plain sign of the wrapper — no
-# --deep and no pre-signing the inner binary, both of which trip on
-# the resource-only .bundle in Contents/Resources.
+# codesign rejects), sign the inner binary, then the wrapper — NO
+# --deep (it chokes on the resource-only .bundle in
+# Contents/Resources). Two passes because the freshly cp -R'd
+# resource bundle sometimes still carries a Finder xattr on the
+# first pass. Falls back to ad-hoc when SIGN_IDENTITY=- or the
+# Developer ID cert is absent (local-only; not notarizable).
+SIGNED_DEVID=0
 sign_app() {
-  # Two attempts: the freshly cp -R'd resource bundle sometimes
-  # still has Finder xattrs on the first pass that codesign rejects
-  # ("resource fork … not allowed"); a second xattr-strip + sign
-  # then takes cleanly.
   local i
+  if [ "$SIGN_IDENTITY" != "-" ] \
+     && security find-identity -v -p codesigning 2>/dev/null \
+        | grep -q "$SIGN_IDENTITY"; then
+    for i in 1 2; do
+      xattr -cr "$APP" 2>/dev/null || true
+      if codesign --force --options runtime --timestamp \
+           --sign "$SIGN_IDENTITY" "$APP/Contents/MacOS/$BIN_NAME" \
+           >/dev/null 2>&1 \
+         && codesign --force --options runtime --timestamp \
+              --sign "$SIGN_IDENTITY" "$APP" >/dev/null 2>&1 \
+         && codesign --verify --strict "$APP" >/dev/null 2>&1; then
+        SIGNED_DEVID=1
+        return 0
+      fi
+    done
+  fi
+  # Ad-hoc fallback (local-only; cannot be notarized).
   for i in 1 2; do
     xattr -cr "$APP" 2>/dev/null || true
     if codesign --force --sign - "$APP" >/dev/null 2>&1 \
@@ -92,10 +114,39 @@ sign_app() {
   return 1
 }
 if sign_app; then
-  echo "✓ Built + ad-hoc signed $APP"
+  if [ "$SIGNED_DEVID" = "1" ]; then
+    echo "✓ Built + Developer ID signed $APP"
+  else
+    echo "✓ Built + ad-hoc signed $APP (local only — not notarizable)"
+  fi
 else
   echo "✓ Built $APP (unsigned — runs locally, may prompt on"
   echo "  first launch from /Applications: right-click → Open)"
+fi
+
+# ── Notarize + staple (only when Developer ID signed) ─────────────
+# Staples the ticket onto the .app so the installed copy is
+# Gatekeeper-trusted offline. Non-fatal: a creds-less / rejected
+# build still completes, just signed-only. Runs BEFORE --install so
+# the copy placed in /Applications is the stapled one.
+if [ "$SIGNED_DEVID" = "1" ]; then
+  echo "▸ Notarizing $APP (waits on Apple)…"
+  NZIP="$(mktemp -d)/notarize.zip"
+  ditto -c -k --keepParent "$APP" "$NZIP"
+  if xcrun notarytool submit "$NZIP" \
+       --keychain-profile "$NOTARY_PROFILE" --wait; then
+    if xcrun stapler staple "$APP"; then
+      if xcrun stapler validate "$APP"; then
+        echo "✓ notarized + stapled $APP"
+      else
+        echo "⚠ staple validate failed for $APP"
+      fi
+    else
+      echo "⚠ stapling failed for $APP"
+    fi
+  else
+    echo "⚠ notarization skipped/failed — $APP signed but not notarized"
+  fi
 fi
 
 if [ "${1:-}" = "--install" ]; then
