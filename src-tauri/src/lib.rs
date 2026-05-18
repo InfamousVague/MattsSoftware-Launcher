@@ -23,6 +23,7 @@ pub fn run() {
             install::uninstall_app,
             settings::load_settings,
             settings::save_settings,
+            settings::set_open_at_login,
         ])
         .run(tauri::generate_context!())
         .expect("error while running MattsSoftware launcher");

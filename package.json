@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@mattmattmattmatt/base": "file:../../Libs/base",
-    "@tauri-apps/api": "2.10",
+    "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-opener": "^2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

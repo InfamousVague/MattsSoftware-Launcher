@@ -3,6 +3,25 @@
    --shadow-*) so it tracks the monochrome theme + dark/light flip
    automatically. Simple, icon-forward, single page. */
 
+/* Force a WHITE accent everywhere. The Base kit's chromatic accent
+   (`data-color="true"`) was tinting every active/selected/focus
+   surface blurple — category pills, focus rings, carousel dots, the
+   progress bar, and Base's own primary buttons all read
+   `var(--color-accent)`. Overriding the four accent tokens at the
+   root (with `!important` so it beats Base's `[data-theme]` /
+   `[data-color]` rules regardless of specificity, and at `:root` so
+   it also covers the lightbox/dialogs that portal to <body> outside
+   `.ms-app`) makes every one of them white in a single place,
+   independent of the "Coloured accent" setting. `--color-accent-text`
+   stays near-black so labels/icons on the white accent (primary
+   buttons, the active pill) keep their contrast. */
+:root {
+  --color-accent: #ffffff !important;
+  --color-accent-hover: #e9e9ec !important;
+  --color-accent-subtle: rgba(255, 255, 255, 0.14) !important;
+  --color-accent-text: #09090b !important;
+}
+
 *,
 *::before,
 *::after {
@@ -39,10 +58,14 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-4);
-  /* Left inset clears the macOS traffic lights (x:18 in
-     tauri.conf). Generous so the wordmark never collides. */
-  padding: var(--sp-3) var(--sp-6) var(--sp-3) 92px;
-  min-height: 56px;
+  /* Left inset clears the macOS traffic lights horizontally (they
+     span ~x19→x70 with trafficLightPosition x:19). Fixed height so
+     the traffic-light vertical alignment is deterministic: the
+     brand text is vertically centered, and trafficLightPosition.y
+     in tauri.conf is tuned to put the light cluster's centre on
+     that same line. */
+  padding: 0 var(--sp-6) 0 88px;
+  height: 60px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--color-border-subtle);
   background: var(--color-bg-primary);
@@ -51,32 +74,20 @@ body {
 .ms-brand {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
   min-width: 0;
-}
-
-.ms-brand__mark {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-md);
-  background: var(--color-accent);
-  color: var(--color-bg-primary);
-  flex-shrink: 0;
 }
 
 .ms-brand__text {
   display: flex;
   flex-direction: column;
-  line-height: 1.2;
+  line-height: 1.25;
   min-width: 0;
 }
 
 .ms-brand__name {
-  font-size: var(--text-base-size);
+  font-size: var(--text-lg-size);
   font-weight: var(--weight-bold);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 }
 
 .ms-brand__sub {
@@ -155,6 +166,11 @@ body {
   gap: var(--sp-4);
   max-width: 1200px;
   margin: 0 auto;
+  /* Every row track the same height (= the tallest card across the
+     grid), so 1- vs 2-line taglines don't make cards uneven. The
+     wrap → Card → .ms-card chain below all stretch to fill the
+     track, and the footer is bottom-pinned via margin-top:auto. */
+  grid-auto-rows: 1fr;
 }
 
 .ms-banner {
@@ -229,6 +245,18 @@ body {
   cursor: pointer;
   border-radius: var(--radius-lg);
   outline: none;
+  /* Grid item: fill the (uniform) row track so all cards match. */
+  height: 100%;
+  display: flex;
+}
+
+/* The Base <Card> element between the wrap and .ms-card — make it
+   stretch too so the height chain is unbroken regardless of Base's
+   internal markup. */
+.ms-card-wrap > * {
+  flex: 1;
+  display: flex;
+  min-width: 0;
 }
 
 .ms-card-wrap:focus-visible {
@@ -236,6 +264,7 @@ body {
 }
 
 .ms-card {
+  flex: 1;
   display: flex;
   gap: var(--sp-4);
   padding: var(--sp-4);
@@ -416,6 +445,281 @@ body {
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: var(--sp-5);
+}
+
+/* ─── Screenshot carousel ────────────────────────────────────── */
+
+.ms-carousel {
+  margin-bottom: var(--sp-5);
+  outline: none;
+}
+
+.ms-carousel:focus-visible .ms-carousel__stage {
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
+
+.ms-carousel__stage {
+  position: relative;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-secondary);
+  overflow: hidden;
+}
+
+.ms-carousel__track {
+  display: flex;
+  transition: transform 0.32s var(--ease-out, ease-out);
+}
+
+.ms-carousel__slide {
+  flex: 0 0 100%;
+  height: 220px;
+  display: grid;
+  place-items: center;
+}
+
+/* Lightbox blows the slides up to fill the viewport. */
+.ms-carousel__stage--lightbox .ms-carousel__slide {
+  height: 82vh;
+}
+
+.ms-carousel__slide img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Expand-to-fullscreen affordance, top-right of the inline stage. */
+.ms-carousel__expand {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
+}
+
+.ms-carousel__stage--inline:hover .ms-carousel__expand,
+.ms-carousel:focus-visible .ms-carousel__expand {
+  opacity: 1;
+}
+
+/* ─── Full-screen lightbox ───────────────────────────────────── */
+
+.ms-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-8);
+  background: rgba(0, 0, 0, 0.86);
+  backdrop-filter: blur(4px);
+  animation: ms-fade var(--transition-fast);
+}
+
+.ms-lightbox__inner {
+  width: min(1100px, 92vw);
+  max-width: 92vw;
+}
+
+/* In the lightbox the stage is borderless + transparent so the
+   screenshot floats on the dimmed backdrop. */
+.ms-lightbox .ms-carousel__stage {
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+/* Bigger tap targets + brighter dots over the dark backdrop. */
+.ms-lightbox .ms-carousel__nav--prev {
+  left: calc(-1 * var(--sp-6));
+}
+
+.ms-lightbox .ms-carousel__nav--next {
+  right: calc(-1 * var(--sp-6));
+}
+
+.ms-lightbox .ms-carousel__dots {
+  margin-top: var(--sp-5);
+}
+
+.ms-lightbox .ms-carousel__dot {
+  width: 8px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.ms-lightbox .ms-carousel__dot--active {
+  background: #ffffff;
+}
+
+.ms-lightbox__close {
+  position: absolute;
+  top: var(--sp-5);
+  right: var(--sp-5);
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.ms-lightbox__close:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.ms-carousel__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  /* The Base secondary Button already gives a solid surface; just
+     park it on the edge with a little inset + a soft drop so it
+     reads above the screenshot. */
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
+}
+
+.ms-carousel__nav--prev {
+  left: var(--sp-2);
+}
+
+.ms-carousel__nav--next {
+  right: var(--sp-2);
+}
+
+.ms-carousel__dots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin-top: var(--sp-3);
+}
+
+.ms-carousel__dot {
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-border-strong, var(--color-border-default));
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.ms-carousel__dot:hover {
+  transform: scale(1.2);
+}
+
+.ms-carousel__dot--active {
+  background: var(--color-accent);
+  transform: scale(1.25);
+}
+
+.ms-detail__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--sp-5);
+}
+
+.ms-detail__progress-msg {
+  font-size: var(--text-xs-size);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+}
+
+/* In-house progress bar (token-styled — same rationale as the
+   chips: avoids the Base Progress primitive's unused-React import
+   tripping strict tsconfig). Determinate via inline width;
+   indeterminate via a sliding sweep. */
+.ms-bar {
+  position: relative;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-secondary);
+  overflow: hidden;
+}
+
+.ms-bar__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent);
+  transition: width 0.25s var(--ease-out, ease-out);
+}
+
+.ms-bar--indeterminate .ms-bar__fill {
+  width: 40%;
+  animation: ms-bar-slide 1.1s var(--ease-in-out, ease-in-out)
+    infinite;
+}
+
+@keyframes ms-bar-slide {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(280%);
+  }
+}
+
+.ms-detail__notes {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--sp-3) var(--sp-4);
+  margin-bottom: var(--sp-4);
+  background: var(--color-bg-secondary);
+}
+
+.ms-detail__notes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-2);
+}
+
+.ms-detail__notes-title {
+  font-size: var(--text-sm-size);
+  font-weight: var(--weight-semibold);
+}
+
+.ms-detail__notes-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--text-xs-size);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+}
+
+.ms-detail__notes-link:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-elevated);
+}
+
+.ms-detail__notes-body {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  max-height: 180px;
+  overflow-y: auto;
 }
 
 .ms-detail__versions {

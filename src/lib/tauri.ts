@@ -14,6 +14,8 @@ export interface AppStatus {
   latest_version: string | null;
   download_url: string | null;
   updatable: boolean;
+  release_notes: string | null;
+  release_url: string | null;
   error: string | null;
 }
 
@@ -29,6 +31,9 @@ export interface InstallProgress {
   id: string;
   phase: InstallPhase;
   message: string;
+  /// 0-100 during the download phase when a Content-Length was
+  /// known; null/absent for indeterminate phases.
+  pct?: number | null;
 }
 
 export interface LauncherSettings {
@@ -36,6 +41,7 @@ export interface LauncherSettings {
   accent_color: boolean;
   auto_check_updates: boolean;
   launch_after_install: boolean;
+  open_at_login: boolean;
 }
 
 export function fetchStatuses(apps: AppRef[]): Promise<AppStatus[]> {
@@ -67,6 +73,11 @@ export function loadSettings(): Promise<LauncherSettings> {
 
 export function saveSettings(settings: LauncherSettings): Promise<void> {
   return invoke("save_settings", { settings });
+}
+
+/// Add/remove MattsSoftware as a macOS Login Item.
+export function setOpenAtLogin(enabled: boolean): Promise<void> {
+  return invoke("set_open_at_login", { enabled });
 }
 
 /// Subscribe to the backend's per-install progress stream. Returns

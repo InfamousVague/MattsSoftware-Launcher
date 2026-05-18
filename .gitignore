@@ -7,6 +7,12 @@ dist-ssr
 src-tauri/target
 src-tauri/gen
 
+# Native Swift menu-bar companion build artifacts
+menubar/.build/
+menubar/.swiftpm/
+menubar/*.app/
+menubar/*.dmg
+
 # Tauri generates these from the icon source; keep the source, not
 # the derived set, out of history if you regenerate often. (Left
 # tracked by default — uncomment to ignore.)

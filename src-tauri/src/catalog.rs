@@ -63,6 +63,10 @@ pub struct AppStatus {
     pub download_url: Option<String>,
     /// True when installed AND a newer version is available.
     pub updatable: bool,
+    /// Latest release's notes (GitHub release `body`), trimmed.
+    pub release_notes: Option<String>,
+    /// Latest release's web page (GitHub release `html_url`).
+    pub release_url: Option<String>,
     /// Populated when the status probe itself failed (offline, rate
     /// limited, …) so the UI can show "couldn't check" rather than
     /// silently implying up-to-date.
@@ -110,9 +114,16 @@ fn installed_version(bundle_name: &str) -> Option<String> {
     }
 }
 
-/// Latest GitHub release: `(tag, first .dmg asset url)`. `repo` may
-/// be `owner/name` or bare `name` (owner defaults to InfamousVague).
-fn github_latest(repo: &str) -> anyhow::Result<(String, Option<String>)> {
+/// Latest GitHub release. `repo` may be `owner/name` or bare `name`
+/// (owner defaults to InfamousVague).
+struct Release {
+    tag: String,
+    dmg: Option<String>,
+    notes: Option<String>,
+    html_url: Option<String>,
+}
+
+fn github_latest(repo: &str) -> anyhow::Result<Release> {
     let full = if repo.contains('/') {
         repo.to_string()
     } else {
@@ -153,7 +164,24 @@ fn github_latest(repo: &str) -> anyhow::Result<(String, Option<String>)> {
                 }
             })
         });
-    Ok((tag, dmg))
+    let notes = json
+        .get("body")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        // Keep the payload sane — release bodies can be huge; the UI
+        // only shows a "what's new" teaser + a link to the full page.
+        .map(|s| s.chars().take(1200).collect::<String>());
+    let html_url = json
+        .get("html_url")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    Ok(Release {
+        tag,
+        dmg,
+        notes,
+        html_url,
+    })
 }
 
 /// Loose version comparison. We don't need full semver ordering —
@@ -174,17 +202,21 @@ fn one_status(app: &AppRef) -> AppStatus {
 
     let mut latest_version = None;
     let mut download_url = None;
+    let mut release_notes = None;
+    let mut release_url = None;
     let mut error = None;
 
     match app.channel {
         Channel::Github => {
             if let Some(repo) = app.github_repo.as_deref() {
                 match github_latest(repo) {
-                    Ok((tag, dmg)) => {
-                        if !tag.is_empty() {
-                            latest_version = Some(tag);
+                    Ok(r) => {
+                        if !r.tag.is_empty() {
+                            latest_version = Some(r.tag);
                         }
-                        download_url = dmg;
+                        download_url = r.dmg;
+                        release_notes = r.notes;
+                        release_url = r.html_url;
                     }
                     Err(e) => error = Some(e.to_string()),
                 }
@@ -208,6 +240,8 @@ fn one_status(app: &AppRef) -> AppStatus {
         latest_version,
         download_url,
         updatable,
+        release_notes,
+        release_url,
         error,
     }
 }

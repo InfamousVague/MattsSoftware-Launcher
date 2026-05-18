@@ -19,12 +19,33 @@
 /// non-installable entries.
 
 import blipIcon from "../assets/appicons/blip.png";
-import vyvIcon from "../assets/appicons/vyv.png";
+import espressoIcon from "../assets/appicons/espresso.png";
 import dianeIcon from "../assets/appicons/diane.png";
 import baseIcon from "../assets/appicons/base.png";
 import stashIcon from "../assets/appicons/stash.png";
+import portIcon from "../assets/appicons/port.png";
+import peepholeIcon from "../assets/appicons/peephole.png";
+import quarantineIcon from "../assets/appicons/quarantine.png";
+import sentryIcon from "../assets/appicons/sentry.png";
+import alfredIcon from "../assets/appicons/alfred.png";
 import fishbonesIcon from "../assets/appicons/fishbones.png";
 import tapIcon from "../assets/appicons/tap.png";
+
+// Screenshot strips (real captures from the marketing site). Only
+// the apps with published screenshots have them; the detail panel
+// hides the gallery when the array is empty.
+import blipShot1 from "../assets/screenshots/blip/firewall.png";
+import blipShot2 from "../assets/screenshots/blip/guard.png";
+import blipShot3 from "../assets/screenshots/blip/hops.png";
+import vyvShot1 from "../assets/screenshots/vyv/jiggle.png";
+import vyvShot2 from "../assets/screenshots/vyv/stats.png";
+import vyvShot3 from "../assets/screenshots/vyv/timer.png";
+import dianeShot1 from "../assets/screenshots/diane/library.png";
+import dianeShot2 from "../assets/screenshots/diane/recorder.png";
+import dianeShot3 from "../assets/screenshots/diane/transcription.png";
+import stashShot1 from "../assets/screenshots/stash/directory.png";
+import stashShot2 from "../assets/screenshots/stash/health.png";
+import stashShot3 from "../assets/screenshots/stash/pull-preview.png";
 
 export type Channel = "github" | "appstore" | "dmg" | "library";
 
@@ -54,6 +75,8 @@ export interface CatalogApp {
   bundleName?: string;
   /// One-liner shown on the detail panel's "why it exists" line.
   pitch?: string;
+  /// Optional screenshot strip shown in the detail panel.
+  screenshots?: string[];
 }
 
 export const CATALOG: readonly CatalogApp[] = [
@@ -70,20 +93,28 @@ export const CATALOG: readonly CatalogApp[] = [
     githubRepo: "Blip",
     bundleName: "Blip",
     pitch: "Watch every connection your Mac makes, in real time.",
+    screenshots: [blipShot1, blipShot2, blipShot3],
   },
   {
-    id: "vyv",
-    name: "Vyv",
-    tagline: "Your computer wants to sleep. Vyv disagrees.",
+    // Vyv was renamed to Espresso (the native-Swift rewrite). The
+    // GitHub repo + the installed .app bundle both moved to
+    // "Espresso", so installed-detection + release lookup target
+    // the new name. Screenshots are the same app's (still under the
+    // legacy `screenshots/vyv/` asset dir — same captures, no need
+    // to churn the files).
+    id: "espresso",
+    name: "Espresso",
+    tagline: "Your computer wants to sleep. Espresso disagrees.",
     description:
       "Keep-awake utility that prevents your computer from sleeping. Timed sessions, mouse-jiggle simulation, lid-closed override, and a panic hotkey for instant deactivation.",
     category: "Utilities",
-    icon: vyvIcon,
-    tags: ["Utility", "Cross-Platform", "Productivity"],
+    icon: espressoIcon,
+    tags: ["Utility", "Menu Bar", "Productivity", "macOS"],
     channel: "github",
-    githubRepo: "Vyv",
-    bundleName: "Vyv",
+    githubRepo: "Espresso",
+    bundleName: "Espresso",
     pitch: "Stay awake on your terms.",
+    screenshots: [vyvShot1, vyvShot2, vyvShot3],
   },
   {
     id: "diane",
@@ -98,6 +129,7 @@ export const CATALOG: readonly CatalogApp[] = [
     githubRepo: "Diane",
     bundleName: "Diane",
     pitch: "Dictate, transcribe, and keep a tape library.",
+    screenshots: [dianeShot1, dianeShot2, dianeShot3],
   },
   {
     id: "stash",
@@ -112,6 +144,77 @@ export const CATALOG: readonly CatalogApp[] = [
     githubRepo: "Stash",
     bundleName: "Stash",
     pitch: "An encrypted vault for every project's secrets.",
+    screenshots: [stashShot1, stashShot2, stashShot3],
+  },
+  {
+    id: "port",
+    name: "Port",
+    tagline: "Every open port on your Mac, one click away.",
+    description:
+      "A native menu-bar port manager: see what's listening, kill or pause the process, forward or NAT-PMP-map it, and watch active connections on a live map — click one to inspect it in Blip.",
+    category: "Developer Tools",
+    icon: portIcon,
+    tags: ["Menu Bar", "Network", "Developer Tools", "macOS"],
+    channel: "github",
+    githubRepo: "Port",
+    bundleName: "Port",
+    pitch: "See what's listening — and shut it down.",
+  },
+  {
+    id: "peephole",
+    name: "Peephole",
+    tagline: "See who's watching.",
+    description:
+      "A menu-bar sentinel for your camera and microphone: which apps are using them right now, a history of access, and a notification the moment something turns them on.",
+    category: "Privacy & Security",
+    icon: peepholeIcon,
+    tags: ["Menu Bar", "Privacy", "Camera & Mic", "macOS"],
+    channel: "github",
+    githubRepo: "Peephole",
+    bundleName: "Peephole",
+    pitch: "Know the instant your camera or mic turns on.",
+  },
+  {
+    id: "quarantine",
+    name: "Quarantine",
+    tagline: "Trust, but verify every download.",
+    description:
+      "A menu-bar inspector for ~/Downloads: quarantine origin, Gatekeeper/codesign status, SHA-256, and an optional VirusTotal verdict for every new file, with a notification to vet it.",
+    category: "Privacy & Security",
+    icon: quarantineIcon,
+    tags: ["Menu Bar", "Privacy", "Downloads", "macOS"],
+    channel: "github",
+    githubRepo: "Quarantine",
+    bundleName: "Quarantine",
+    pitch: "Vet every file that lands in Downloads.",
+  },
+  {
+    id: "sentry",
+    name: "Sentry",
+    tagline: "Know the moment something digs in.",
+    description:
+      "A menu-bar auditor for macOS persistence — LaunchAgents, login items, cron, and shell startup files — with signature checks and alerts when something new or changed appears. Read-only.",
+    category: "Privacy & Security",
+    icon: sentryIcon,
+    tags: ["Menu Bar", "Privacy", "Persistence", "macOS"],
+    channel: "github",
+    githubRepo: "Sentry",
+    bundleName: "Sentry",
+    pitch: "Catch persistence the moment it's planted.",
+  },
+  {
+    id: "alfred",
+    name: "Alfred",
+    tagline: "Reclaim the disk space dev cruft is hoarding.",
+    description:
+      "A native menu-bar valet that finds safe-to-delete developer cruft — node_modules, Cargo target/, build & test caches, Xcode DerivedData, package-manager caches — sizes it biggest-first, and moves it to the Trash (recoverable).",
+    category: "Developer Tools",
+    icon: alfredIcon,
+    tags: ["Menu Bar", "Disk", "Developer Tools", "macOS"],
+    channel: "github",
+    githubRepo: "Alfred",
+    bundleName: "Alfred",
+    pitch: "Take back the gigabytes node_modules forgot about.",
   },
   {
     id: "fishbones",

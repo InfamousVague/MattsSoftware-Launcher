@@ -1,0 +1,375 @@
+/* Settings modal — visual language ported from Libre.academy's
+   SettingsDialog (the Cipher-style two-column layout: left nav
+   rail + right scrollable card/row pane, pill toggles, footer
+   version chip). Classes are `ms-set-` prefixed so the launcher
+   owns them independently of Libre. All colours go through Base
+   tokens, so this tracks the launcher's white-accent override. */
+
+.ms-set-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  animation: ms-set-fade 0.16s ease;
+}
+
+@keyframes ms-set-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.ms-set-panel {
+  position: relative;
+  width: min(820px, 94vw);
+  height: min(620px, 86vh);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-xl, 14px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  box-shadow: var(--shadow-lg);
+}
+
+.ms-set-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: 5;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+
+.ms-set-close:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+.ms-set-columns {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ─── Nav rail ───────────────────────────────────────────────── */
+
+.ms-set-nav {
+  display: flex;
+  flex-direction: column;
+  width: 224px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--color-border-default);
+  background: var(--color-bg-secondary);
+  overflow-y: auto;
+}
+
+.ms-set-nav__titlebar {
+  padding: 20px 20px 14px;
+}
+
+.ms-set-nav__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: var(--weight-semibold, 600);
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+}
+
+.ms-set-nav__list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 8px;
+}
+
+.ms-set-nav__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 8px 9px 12px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-md, 8px);
+  color: var(--color-text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.ms-set-nav__item:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+.ms-set-nav__item--active,
+.ms-set-nav__item--active:hover {
+  background: color-mix(
+    in srgb,
+    var(--color-accent) 14%,
+    transparent
+  );
+  color: var(--color-accent);
+}
+
+.ms-set-nav__item-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--color-text-tertiary);
+  transition: color 0.12s ease;
+}
+
+.ms-set-nav__item:hover .ms-set-nav__item-icon,
+.ms-set-nav__item--active .ms-set-nav__item-icon {
+  color: currentColor;
+}
+
+.ms-set-nav__item-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ms-set-nav__item-label {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.ms-set-nav__item-hint {
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ms-set-nav__item--active .ms-set-nav__item-hint {
+  color: color-mix(
+    in srgb,
+    var(--color-accent) 70%,
+    var(--color-text-secondary)
+  );
+}
+
+.ms-set-nav__item-chev {
+  flex-shrink: 0;
+  display: inline-flex;
+  color: var(--color-text-tertiary);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.ms-set-nav__item--active .ms-set-nav__item-chev {
+  opacity: 0.8;
+}
+
+.ms-set-nav__footer {
+  padding: 12px 20px 16px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+/* ─── Body pane ──────────────────────────────────────────────── */
+
+.ms-set-body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-primary);
+}
+
+.ms-set-body__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--color-border-default);
+  position: sticky;
+  top: 0;
+  background: var(--color-bg-primary);
+  z-index: 2;
+  flex-shrink: 0;
+}
+
+.ms-set-body__header-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+.ms-set-body__header-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  letter-spacing: -0.005em;
+}
+
+.ms-set-body__header-hint {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+}
+
+.ms-set-page {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  max-width: 620px;
+  padding: 20px 22px 24px;
+}
+
+/* ─── Card + rows ────────────────────────────────────────────── */
+
+.ms-set-card {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg, 12px);
+  overflow: hidden;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 4px 10px rgba(0, 0, 0, 0.18);
+}
+
+.ms-set-row {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.ms-set-row:first-child {
+  border-top: 0;
+}
+
+.ms-set-row__icon {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+}
+
+.ms-set-row__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ms-set-row__label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  line-height: 1.3;
+}
+
+.ms-set-row__sub {
+  font-size: 12.5px;
+  color: var(--color-text-tertiary);
+  line-height: 1.4;
+}
+
+/* ─── Pill toggle (green "on", like Libre) ───────────────────── */
+
+.ms-set-switch {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.16s ease;
+  padding: 0;
+}
+
+[data-theme="light"] .ms-set-switch {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.ms-set-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ms-set-switch--on {
+  background: var(--color-success, #22c55e);
+}
+
+.ms-set-switch--on::after {
+  transform: translateX(16px);
+}
+
+.ms-set-switch:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.ms-set-switch--on:focus-visible {
+  outline-color: var(--color-success, #22c55e);
+}
+
+@media (max-width: 640px) {
+  .ms-set-panel {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+  }
+  .ms-set-nav {
+    width: 188px;
+  }
+}

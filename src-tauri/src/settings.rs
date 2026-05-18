@@ -18,6 +18,11 @@ pub struct LauncherSettings {
     pub auto_check_updates: bool,
     /// Launch apps immediately after a successful install.
     pub launch_after_install: bool,
+    /// Start MattsSoftware itself when the user logs in (macOS
+    /// Login Item). Mirrors the actual System Events state — the
+    /// frontend calls `set_open_at_login` to apply it.
+    #[serde(default)]
+    pub open_at_login: bool,
 }
 
 impl Default for LauncherSettings {
@@ -27,6 +32,7 @@ impl Default for LauncherSettings {
             accent_color: false,
             auto_check_updates: true,
             launch_after_install: false,
+            open_at_login: false,
         }
     }
 }
@@ -58,5 +64,56 @@ pub fn save_settings(
     let path = settings_path(&app).map_err(|e| e.to_string())?;
     let json = serde_json::to_vec_pretty(&settings).map_err(|e| e.to_string())?;
     fs::write(&path, json).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Resolve the MattsSoftware `.app` bundle path. From the running
+/// binary we walk ancestors for the `…/MattsSoftware.app` wrapper
+/// (`…/MattsSoftware.app/Contents/MacOS/<bin>`). In `tauri dev`
+/// there's no bundle, so fall back to the conventional install
+/// location — toggling the Login Item is only meaningful for a
+/// packaged install anyway.
+fn app_bundle_path() -> std::path::PathBuf {
+    if let Ok(exe) = std::env::current_exe() {
+        for anc in exe.ancestors() {
+            if anc.extension().and_then(|e| e.to_str()) == Some("app") {
+                return anc.to_path_buf();
+            }
+        }
+    }
+    std::path::PathBuf::from("/Applications/MattsSoftware.app")
+}
+
+/// Add / remove MattsSoftware as a macOS Login Item via System
+/// Events (no extra entitlement needed; the user authorises the
+/// automation prompt the first time). Idempotent: we always delete
+/// any existing entry first so enabling twice doesn't duplicate it.
+#[tauri::command]
+pub async fn set_open_at_login(enabled: bool) -> Result<(), String> {
+    let bundle = app_bundle_path();
+    let path = bundle.to_string_lossy().to_string();
+    // Always clear an existing entry first (ignore "not found").
+    let _ = std::process::Command::new("osascript")
+        .args([
+            "-e",
+            "tell application \"System Events\" to delete login item \"MattsSoftware\"",
+        ])
+        .output();
+    if enabled {
+        let script = format!(
+            "tell application \"System Events\" to make login item at end \
+             with properties {{path:\"{path}\", hidden:false}}"
+        );
+        let out = std::process::Command::new("osascript")
+            .args(["-e", &script])
+            .output()
+            .map_err(|e| format!("could not set login item: {e}"))?;
+        if !out.status.success() {
+            return Err(format!(
+                "could not set login item: {}",
+                String::from_utf8_lossy(&out.stderr)
+            ));
+        }
+    }
     Ok(())
 }

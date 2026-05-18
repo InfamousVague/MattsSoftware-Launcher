@@ -11,10 +11,12 @@ import "@base/primitives/icon/icon.css";
 import { x as xIcon } from "@base/primitives/icon/icons/x";
 import { folderOpen } from "@base/primitives/icon/icons/folder-open";
 import { trash2 } from "@base/primitives/icon/icons/trash-2";
+import { externalLink } from "@base/primitives/icon/icons/external-link";
 import { ActionButton } from "./ActionButton";
+import { ScreenshotCarousel } from "./ScreenshotCarousel";
 import type { CatalogApp } from "../data/catalog";
 import type { AppStatus, InstallProgress } from "../lib/tauri";
-import { revealApp } from "../lib/tauri";
+import { revealApp, openExternal } from "../lib/tauri";
 
 interface Props {
   app: CatalogApp | null;
@@ -103,20 +105,65 @@ export function AppDetail({
             app={app}
             status={status}
             progress={progress}
-            size="lg"
+            size="md"
             onInstall={onInstall}
             onOpen={onOpen}
           />
-          <ActionButton
-            app={app}
-            status={status}
-            progress={progress}
-            size="lg"
-            secondary
-            onInstall={onInstall}
-            onOpen={onOpen}
-          />
+          {/* Only show the secondary "Open" when the primary ISN'T
+              already an Open button — i.e. there's an update, so
+              primary = "Update" and a separate "Open" is useful.
+              When the app is installed + current the primary is
+              itself "Open", so a second one would just duplicate
+              it ("Open" / "Open"). */}
+          {status?.installed &&
+            status.updatable &&
+            !!app.bundleName && (
+              <ActionButton
+                app={app}
+                status={status}
+                progress={progress}
+                size="md"
+                secondary
+                onInstall={onInstall}
+                onOpen={onOpen}
+              />
+            )}
         </div>
+
+        {progress &&
+          progress.phase !== "done" &&
+          progress.phase !== "error" && (
+            <div className="ms-detail__progress">
+              <div
+                className={
+                  "ms-bar" +
+                  (typeof progress.pct === "number"
+                    ? ""
+                    : " ms-bar--indeterminate")
+                }
+                role="progressbar"
+                aria-valuenow={
+                  typeof progress.pct === "number"
+                    ? progress.pct
+                    : undefined
+                }
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <div
+                  className="ms-bar__fill"
+                  style={
+                    typeof progress.pct === "number"
+                      ? { width: `${progress.pct}%` }
+                      : undefined
+                  }
+                />
+              </div>
+              <span className="ms-detail__progress-msg">
+                {progress.message}
+              </span>
+            </div>
+          )}
 
         {app.pitch && <p className="ms-detail__pitch">{app.pitch}</p>}
         <p className="ms-detail__desc">{app.description}</p>
@@ -128,6 +175,13 @@ export function AppDetail({
             </span>
           ))}
         </div>
+
+        {app.screenshots && app.screenshots.length > 0 && (
+          <ScreenshotCarousel
+            images={app.screenshots}
+            appName={app.name}
+          />
+        )}
 
         {(status?.installed || status?.latest_version) && (
           <div className="ms-detail__versions">
@@ -150,6 +204,36 @@ export function AppDetail({
             {status?.error && (
               <VersionRow label="Note" value={status.error} />
             )}
+          </div>
+        )}
+
+        {status?.release_notes && (
+          <div className="ms-detail__notes">
+            <div className="ms-detail__notes-head">
+              <span className="ms-detail__notes-title">
+                What’s new
+                {status.latest_version ? ` · ${status.latest_version}` : ""}
+              </span>
+              {status.release_url && (
+                <button
+                  type="button"
+                  className="ms-detail__notes-link"
+                  onClick={() =>
+                    void openExternal(status.release_url as string)
+                  }
+                >
+                  Release page
+                  <Icon
+                    icon={externalLink}
+                    size="xs"
+                    color="currentColor"
+                  />
+                </button>
+              )}
+            </div>
+            <p className="ms-detail__notes-body">
+              {status.release_notes}
+            </p>
           </div>
         )}
 

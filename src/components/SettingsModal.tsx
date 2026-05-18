@@ -105,6 +105,17 @@ export function SettingsModal({
           />
         </Row>
 
+        <Row
+          title="Open at login"
+          hint="Start MattsSoftware automatically when you log in to your Mac."
+        >
+          <Toggle
+            label="Open at login"
+            checked={settings.open_at_login}
+            onChange={(e) => patch({ open_at_login: e.target.checked })}
+          />
+        </Row>
+
         <p className="ms-settings__foot">
           MattsSoftware · built with the Base design system
         </p>
