@@ -171,7 +171,7 @@ enum Services {
             let json =
                 (try? JSONSerialization.jsonObject(with: data))
                 as? [String: Any] ?? [:]
-            let tag = json["tag_name"] as? String ?? ""
+            var tag = json["tag_name"] as? String ?? ""
             var dmg: String?
             if let assets = json["assets"] as? [[String: Any]] {
                 for a in assets {
@@ -182,6 +182,13 @@ enum Services {
                         break
                     }
                 }
+            }
+            // The newest release may be a stray/assetless tag (no CI
+            // build). Don't degrade to the releases page — fall back to
+            // the newest release that actually ships a .dmg.
+            if dmg == nil, let fb = await firstDmgRelease(full) {
+                tag = fb.0
+                dmg = fb.1
             }
             await ReleaseCache.shared.set(
                 full,
@@ -201,6 +208,54 @@ enum Services {
         throw NSError(
             domain: "github", code: http.statusCode,
             userInfo: [NSLocalizedDescriptionKey: msg])
+    }
+
+    /// Best-effort: newest non-draft release that actually has a .dmg.
+    /// Used only when `releases/latest` is assetless, so a stray tag
+    /// can't break Download.
+    private static func firstDmgRelease(
+        _ full: String
+    ) async -> (String, String)? {
+        guard
+            let url = URL(
+                string:
+                    "https://api.github.com/repos/\(full)/releases?per_page=20"
+            )
+        else { return nil }
+        var req = URLRequest(url: url)
+        req.setValue(
+            "MattsSoftware-MenuBar", forHTTPHeaderField: "User-Agent")
+        req.setValue(
+            "application/vnd.github+json",
+            forHTTPHeaderField: "Accept")
+        if let tok = githubToken() {
+            req.setValue(
+                "Bearer \(tok)", forHTTPHeaderField: "Authorization")
+        }
+        req.timeoutInterval = 15
+        guard
+            let (data, resp) = try? await URLSession.shared.data(
+                for: req),
+            let http = resp as? HTTPURLResponse,
+            (200..<300).contains(http.statusCode),
+            let arr =
+                (try? JSONSerialization.jsonObject(with: data))
+                as? [[String: Any]]
+        else { return nil }
+        for rel in arr {
+            if (rel["draft"] as? Bool) == true { continue }
+            let tag = rel["tag_name"] as? String ?? ""
+            if let assets = rel["assets"] as? [[String: Any]] {
+                for a in assets {
+                    if let n = a["name"] as? String,
+                       n.lowercased().hasSuffix(".dmg"),
+                       let u = a["browser_download_url"] as? String {
+                        return (tag, u)
+                    }
+                }
+            }
+        }
+        return nil
     }
 
     /// Loose "is it different" check — any difference surfaces an
