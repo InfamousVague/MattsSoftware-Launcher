@@ -198,10 +198,14 @@ enum Services {
         defer { try? FileManager.default.removeItem(at: tmp) }
 
         phase("Mounting…")
+        // NB: no `-quiet` here. We parse hdiutil's device→mountpoint
+        // table from stdout, and `-quiet` suppresses *all* of it —
+        // which made every install fail with "could not parse
+        // mountpoint". `-quiet` stays on `detach` (nothing parsed).
         let attach = run(
             "/usr/bin/hdiutil",
             [
-                "attach", "-nobrowse", "-noverify", "-quiet",
+                "attach", "-nobrowse", "-noverify",
                 tmp.path, "-mountrandom", "/tmp",
             ])
         guard attach.ok else {
