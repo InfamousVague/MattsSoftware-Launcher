@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 
@@ -64,6 +65,34 @@ final class AppState: ObservableObject {
         if let bn = app.bundleName { Services.openApp(bn) }
     }
 
+    /// Quit (if running) → move the bundle to the Trash → refresh.
+    /// Caller (the row) has already confirmed with the user.
+    func uninstall(_ app: CatalogApp) {
+        guard let bn = app.bundleName else { return }
+        busy[app.id] = "Uninstalling…"
+        Task {
+            let err: String? = await Task.detached {
+                Services.forceQuit(bn)
+                do {
+                    try Services.trashApp(bn)
+                    return nil
+                } catch {
+                    return error.localizedDescription
+                }
+            }.value
+            if let err {
+                busy[app.id] = "Failed: \(err)"
+                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                if busy[app.id]?.hasPrefix("Failed") == true {
+                    busy[app.id] = nil
+                }
+            } else {
+                busy[app.id] = nil
+                await refresh()
+            }
+        }
+    }
+
     /// Updatable apps, in catalog order — what the header's
     /// "N updates" chip counts and "Update all" walks.
     var updatable: [CatalogApp] {
@@ -93,11 +122,50 @@ final class AppState: ObservableObject {
     }
 
     private func runInstall(_ app: CatalogApp, url: String) async {
+        let bn = app.bundleName
+        let isSelf = app.id == "mattssoftware"
+        let isUpdate = statuses[app.id]?.installed == true
         do {
+            // The launcher can't ditto over its own running bundle:
+            // selfUpdate hands the swap to a detached helper that
+            // waits for us to exit, replaces the app, and relaunches
+            // it — so we quit right after it returns.
+            if isSelf {
+                try await Services.selfUpdate(
+                    downloadURL: url
+                ) { msg in
+                    Task { @MainActor in self.busy[app.id] = msg }
+                }
+                busy[app.id] = "Relaunching…"
+                try? await Task.sleep(nanoseconds: 600_000_000)
+                NSApplication.shared.terminate(nil)
+                return
+            }
+
+            // Update/replace: forcefully close the running copy
+            // first (as requested), install, then reopen it.
+            var wasRunning = false
+            if let bn {
+                wasRunning = await Task.detached {
+                    Services.isRunning(bn)
+                }.value
+                if isUpdate || wasRunning {
+                    busy[app.id] = "Quitting \(app.name)…"
+                    await Task.detached {
+                        Services.forceQuit(bn)
+                    }.value
+                }
+            }
+
             _ = try await Services.installApp(
                 app, downloadURL: url
             ) { msg in
                 Task { @MainActor in self.busy[app.id] = msg }
+            }
+
+            if let bn, isUpdate || wasRunning {
+                busy[app.id] = "Reopening \(app.name)…"
+                Services.openApp(bn)
             }
             busy[app.id] = nil
             await refresh()

@@ -9,7 +9,10 @@ enum Channel: String {
 }
 
 /// Display category — the menu groups the lineup under these.
+/// `.launcher` is first so MattsSoftware's own self-update row
+/// pins to the top of the list.
 enum AppCategory: String, CaseIterable {
+    case launcher = "Launcher"
     case developerTools = "Developer Tools"
     case privacySecurity = "Privacy & Security"
     case utilities = "Utilities"
@@ -32,13 +35,26 @@ struct CatalogApp: Identifiable {
     /// app we install (Tap is watchOS; Base is a library).
     let bundleName: String?
     /// Bundled PNG basename (no extension) under Resources/, loaded
-    /// from `Bundle.module` so each row shows the real squircle.
+    /// via Bundle.main so each row shows the real squircle.
     let iconAsset: String
 }
 
 /// Every app I've shipped, sourced from the marketing site's
 /// published copy (mattssoftware.com). Kept in display order.
+/// MattsSoftware itself leads the list so it can OTA self-update
+/// through the same pipeline as everything else.
 let CATALOG: [CatalogApp] = [
+    CatalogApp(
+        id: "mattssoftware",
+        name: "MattsSoftware",
+        tagline: "The menu-bar launcher for every app I've built.",
+        category: .launcher,
+        channel: .github,
+        githubRepo: "InfamousVague/MattsSoftware-Launcher",
+        url: nil,
+        bundleName: "MattsSoftware",
+        iconAsset: "launcher"
+    ),
     CatalogApp(
         id: "blip",
         name: "Blip",

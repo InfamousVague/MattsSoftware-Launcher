@@ -193,6 +193,32 @@ private struct AppRow: View {
         return !b.hasPrefix("Failed") && !b.hasPrefix("No download")
     }
 
+    /// An installed app we own the bundle for can be removed —
+    /// except the launcher itself (you don't trash MattsSoftware
+    /// from inside MattsSoftware) and non-installable channels.
+    private var canUninstall: Bool {
+        guard status?.installed == true, app.bundleName != nil,
+              app.id != "mattssoftware"
+        else { return false }
+        return app.channel == .github || app.channel == .dmg
+    }
+
+    /// Confirm, then quit + Trash. NSAlert is modal on the main
+    /// thread, which is where SwiftUI button actions already run.
+    private func confirmUninstall() {
+        let a = NSAlert()
+        a.alertStyle = .warning
+        a.messageText = "Uninstall \(app.name)?"
+        a.informativeText =
+            "\(app.name) will be quit and moved to the Trash. "
+            + "You can put it back from the Trash later."
+        a.addButton(withTitle: "Uninstall")
+        a.addButton(withTitle: "Cancel")
+        if a.runModal() == .alertFirstButtonReturn {
+            state.uninstall(app)
+        }
+    }
+
     /// Smart action label — the per-app action state machine.
     private var actionLabel: String {
         switch app.channel {
@@ -309,6 +335,12 @@ private struct AppRow: View {
                 Services.openExternal(r)
             }
         }
+        if canUninstall {
+            Divider()
+            Button("Uninstall \(app.name)…", role: .destructive) {
+                confirmUninstall()
+            }
+        }
         if app.channel == .appstore || app.channel == .library,
             let u = app.url
         {
@@ -350,6 +382,15 @@ private struct AppRow: View {
                     .truncationMode(.middle)
             }
             Spacer(minLength: 8)
+            if canUninstall && !isBusy {
+                Button(action: confirmUninstall) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+                .help("Uninstall \(app.name)")
+            }
             actionControl
         }
         .padding(.horizontal, 14)
