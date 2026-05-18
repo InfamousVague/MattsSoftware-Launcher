@@ -33,6 +33,7 @@ APPS=(
   "Sentry|../sentry-swift|InfamousVague/Sentry"
   "Peephole|../peephole-swift|InfamousVague/Peephole"
   "Port|../port-swift|InfamousVague/Port"
+  "StickyKeys|../stickykeys-swift|InfamousVague/StickyKeys"
   "MattsSoftware|.|InfamousVague/MattsSoftware-Launcher"
 )
 
