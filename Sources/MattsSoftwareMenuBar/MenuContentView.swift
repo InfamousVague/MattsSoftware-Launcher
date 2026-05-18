@@ -188,10 +188,19 @@ private struct AppRow: View {
     private var status: AppStatus? { state.statuses[app.id] }
     private var busyMsg: String? { state.busy[app.id] }
 
-    private var isBusy: Bool {
+    /// A message is showing at all (working OR a terminal
+    /// Failed/no-build notice). Either way the row shows the
+    /// message, never the button — so a click is never swallowed.
+    private var hasMessage: Bool { busyMsg != nil }
+
+    /// Actively working → show a spinner. Failed/“No macOS build”
+    /// are terminal notices (no spinner, tinted, self-clearing).
+    private var isWorking: Bool {
         guard let b = busyMsg else { return false }
-        return !b.hasPrefix("Failed") && !b.hasPrefix("No download")
+        return !b.hasPrefix("Failed") && !b.hasPrefix("No ")
     }
+
+    private var isBusy: Bool { isWorking }
 
     /// An installed app we own the bundle for can be removed —
     /// except the launcher itself (you don't trash MattsSoftware
@@ -298,15 +307,23 @@ private struct AppRow: View {
     }
 
     @ViewBuilder private var actionControl: some View {
-        if isBusy {
+        if hasMessage {
+            // Always render the message — working (spinner) OR a
+            // terminal Failed / "No macOS build" notice. Never fall
+            // back to the button here, so a click is never silently
+            // swallowed (the bug behind "Update does nothing").
             HStack(spacing: 5) {
-                ProgressView().controlSize(.small)
+                if isWorking {
+                    ProgressView().controlSize(.small)
+                }
                 Text(busyMsg ?? "Working…")
                     .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .foregroundStyle(
+                        isWorking ? Color.secondary : Color.orange)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.trailing)
             }
-            .frame(minWidth: 76, alignment: .trailing)
+            .frame(minWidth: 76, maxWidth: 150, alignment: .trailing)
         } else {
             Button(actionLabel) {
                 state.primaryAction(app)

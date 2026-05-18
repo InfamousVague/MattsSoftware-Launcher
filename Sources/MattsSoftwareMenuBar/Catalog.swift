@@ -162,7 +162,10 @@ let CATALOG: [CatalogApp] = [
         tagline: "Turn any technical book into an interactive course.",
         category: .learning,
         channel: .github,
-        githubRepo: "Fishbones",
+        // Canonical repo name. The old "Fishbones" still 301s here,
+        // but point straight at it so releases (incl. the new
+        // CI-built notarized macOS .dmg) resolve without a redirect.
+        githubRepo: "Libre",
         url: nil,
         bundleName: "Libre",
         iconAsset: "fishbones"

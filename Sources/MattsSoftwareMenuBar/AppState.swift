@@ -54,8 +54,26 @@ final class AppState: ObservableObject {
             return
         }
         guard let url = st?.downloadURL else {
-            busy[app.id] =
-                st?.error ?? "No download available yet"
+            // No macOS .dmg on the latest release (or a transient
+            // GitHub error). Don't dead-click: open the releases
+            // page so the user can still get the build, and show a
+            // brief, self-clearing reason instead of silently doing
+            // nothing.
+            if app.channel == .github, let repo = app.githubRepo {
+                let full =
+                    repo.contains("/")
+                    ? repo : "\(GITHUB_OWNER)/\(repo)"
+                Services.openExternal(
+                    "https://github.com/\(full)/releases")
+            }
+            let why =
+                st?.error
+                ?? "No macOS build on the latest release — opened releases"
+            busy[app.id] = why
+            Task {
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                if busy[app.id] == why { busy[app.id] = nil }
+            }
             return
         }
         enqueueInstall(app, url: url)

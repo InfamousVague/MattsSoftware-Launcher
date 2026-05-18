@@ -44,14 +44,34 @@ enum Services {
     /// `CFBundleShortVersionString` from the installed bundle, or
     /// nil if it isn't in /Applications. Empty string = present but
     /// version-unknown.
+    ///
+    /// IMPORTANT: read `Contents/Info.plist` straight off disk every
+    /// call. `Bundle(path:)` is cached by Foundation per path for
+    /// the process lifetime — after an in-place update (ditto over
+    /// /Applications/X.app) it keeps reporting the *old* version, so
+    /// the row stayed on "Update" until the launcher was relaunched
+    /// (fresh installs looked fine only because nothing was cached
+    /// for that path yet). A fresh plist read fixes update detection
+    /// without needing a manual refresh / relaunch.
     static func installedVersion(_ bundleName: String) -> String? {
         let path = appBundlePath(bundleName)
         guard FileManager.default.fileExists(atPath: path) else {
             return nil
         }
-        if let b = Bundle(path: path),
-           let v = b.infoDictionary?["CFBundleShortVersionString"]
-               as? String,
+        let plist = "\(path)/Contents/Info.plist"
+        if let dict = NSDictionary(contentsOfFile: plist),
+           let v = dict["CFBundleShortVersionString"] as? String,
+           !v.isEmpty {
+            return v
+        }
+        // Fallback for the rare bundle whose Info.plist isn't at the
+        // standard path — still avoids the cached Bundle by parsing
+        // a fresh instance only as a last resort.
+        if let data = FileManager.default.contents(atPath: plist),
+           let obj = try? PropertyListSerialization.propertyList(
+               from: data, options: [], format: nil),
+           let d = obj as? [String: Any],
+           let v = d["CFBundleShortVersionString"] as? String,
            !v.isEmpty {
             return v
         }
