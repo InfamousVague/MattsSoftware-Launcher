@@ -1,0 +1,17 @@
+node_modules
+dist
+dist-ssr
+*.local
+
+# Rust / Tauri
+src-tauri/target
+src-tauri/gen
+
+# Tauri generates these from the icon source; keep the source, not
+# the derived set, out of history if you regenerate often. (Left
+# tracked by default — uncomment to ignore.)
+# src-tauri/icons
+
+.DS_Store
+*.log
+.vite
