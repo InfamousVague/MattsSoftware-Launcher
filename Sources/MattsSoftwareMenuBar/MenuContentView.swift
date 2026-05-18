@@ -59,7 +59,7 @@ struct MenuContentView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .tracking(2)
                 if updatableCount > 0 {
-                    Text("\(updatableCount)")
+                    PaddedCount(updatableCount)
                         .font(
                             .system(
                                 size: 9, weight: .bold,
@@ -126,7 +126,7 @@ struct MenuContentView: View {
                 .tracking(1)
                 .foregroundStyle(.secondary)
             Spacer()
-            Text("\(count)")
+            PaddedCount(count)
                 .font(
                     .system(
                         size: 10, weight: .medium,
