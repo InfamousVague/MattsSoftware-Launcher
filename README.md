@@ -1,53 +1,60 @@
 # MattsSoftware
 
-An Adobe-CC / MacPaw-style launcher for every app I've built — browse
-them, install them, and keep them up to date from one place.
+A menu-bar launcher for every app I've built — browse them, install
+them, and keep them up to date from one place, without a window.
 
-A single-page Tauri 2 + React TS desktop app, built on the
-[Base](../../Libs/base) design system. Monochrome, icon-forward,
-one settings modal.
+A standalone SwiftUI menu-bar app (`NSStatusItem` + transient
+`NSPopover`, `.accessory` activation) — the same shell every other
+MattsSoftware menu-bar app (Sentry, Port, Peephole, …) uses. No
+Tauri, no web stack, no external dependencies: Foundation + AppKit
++ SwiftUI only.
 
 ## What it does
 
-- **Catalog** — every shipped app (Blip, Vyv, Diane, Stash, Libre,
-  Tap, Base) with real metadata sourced from the marketing site.
+- **Catalog** — every shipped app (Blip, Espresso, Diane, Stash,
+  Port, Peephole, Quarantine, Sentry, Alfred, Libre, Tap, Base)
+  with real metadata sourced from mattssoftware.com, grouped by
+  category, each row showing its real squircle icon.
 - **Detect** — finds installed copies in `/Applications`, reads each
   bundle's `CFBundleShortVersionString`, and version-checks it
-  against the latest release.
-- **Per-app channels** — installs/updates from the right source per
-  app: GitHub Releases (`.dmg` download → mount → copy → detach),
-  the Mac App Store (deep link), or "view source" for the Base
-  library.
-- **Manage** — open, reveal in Finder, or uninstall (to Trash) an
-  installed app; live install progress (download → mount → copy).
-- **Settings** — dark/light, chromatic accent, check-on-launch,
-  launch-after-install; persisted to the app data dir.
+  against the latest GitHub release.
+- **Per-app channels** — one smart action per row: GitHub Releases
+  (`.dmg` download → mount → copy → detach), the Mac App Store
+  (deep link), or "view source" for the Base library.
+- **Install / Update / Open** — live install progress, an
+  "Update all" sweep, and serialised installs (one `hdiutil`
+  mount at a time). Right-click a row for reveal / reinstall /
+  releases.
 
 ## Architecture
 
 ```
-src/                     React single-page UI (Base primitives)
-  data/catalog.ts        the app catalog (real apps + channels)
-  hooks/useCatalogStatus  status probe + install/open/uninstall loop
-  lib/tauri.ts           typed invoke wrappers + progress events
-  components/             AppCard · AppDetail · ActionButton · SettingsModal
-src-tauri/src/
-  catalog.rs             installed-detection + GitHub latest-release
-  install.rs             dmg install / open / reveal / uninstall (+ progress events)
-  settings.rs            persisted launcher preferences
+Package.swift                       SwiftPM executable (macOS 13+)
+Sources/MattsSoftwareMenuBar/
+  MattsSoftwareMenuBarApp.swift     NSStatusItem + NSPopover shell
+  MenuContentView.swift             the popover panel (the whole UI)
+  AppState.swift                    observable store + install queue
+  Services.swift                    install pipeline, GitHub, icons
+  Catalog.swift                     the app catalog (apps + channels)
+  Resources/*.png                   bundled squircle icons
+VERSION                             single source of the app version
+icon.icns                           Finder / Login Items app icon
+package.sh                          build → .app bundle (ad-hoc signed)
 ```
 
-## Develop
+## Build
 
 ```sh
-npm install
-npm run tauri:dev      # Tauri dev shell (Vite on :1420)
-npm run build          # tsc + vite build
-npm run tauri:build    # packaged .app
+swift build                 # debug build
+./package.sh                # release .app into ./dist/
+./package.sh --install      # also install to /Applications
 ```
 
-The Base design system is consumed as raw source via the
-`file:../../Libs/base` dependency (npm symlinks it into
-`node_modules/@mattmattmattmatt/base`); the `@base` Vite alias +
-tsconfig path + `server.fs.allow` entry wire it up — same setup as
-Libre.academy.
+`./package.sh --install` replaces any prior MattsSoftware in
+`/Applications`. Launch it from there, then add it under **System
+Settings → General → Login Items** to keep it in your menu bar at
+every login.
+
+Apple notarization needs a paid Developer ID; `package.sh` ad-hoc
+signs instead, which runs fine locally. A downloaded copy gets a
+one-time right-click → Open.
