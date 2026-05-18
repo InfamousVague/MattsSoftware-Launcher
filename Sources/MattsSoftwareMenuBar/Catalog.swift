@@ -91,6 +91,17 @@ let CATALOG: [CatalogApp] = [
         iconAsset: "diane"
     ),
     CatalogApp(
+        id: "stickykeys",
+        name: "StickyKeys",
+        tagline: "Lock the keyboard so a cleaning cloth can't fire shortcuts.",
+        category: .utilities,
+        channel: .github,
+        githubRepo: "StickyKeys",
+        url: nil,
+        bundleName: "StickyKeys",
+        iconAsset: "stickykeys"
+    ),
+    CatalogApp(
         id: "stash",
         name: "Stash",
         tagline: "Your .env files deserve a bodyguard.",

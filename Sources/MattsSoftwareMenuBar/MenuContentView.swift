@@ -142,14 +142,14 @@ struct MenuContentView: View {
     // MARK: Footer
 
     private var footer: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             Button {
                 Task { await state.refresh() }
             } label: {
-                Label("Refresh", systemImage: "arrow.clockwise")
-                    .font(.system(size: 11))
+                Image(systemName: "arrow.clockwise")
             }
-            .buttonStyle(.plain)
+            .controlSize(.small)
+            .help("Refresh")
             .disabled(state.loading)
 
             Spacer()
@@ -158,25 +158,23 @@ struct MenuContentView: View {
                 Button {
                     state.updateAll()
                 } label: {
-                    Text(
-                        "Update all (\(updatableCount))"
-                    )
-                    .font(
-                        .system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
+                    Image(systemName: "arrow.down.circle")
                 }
-                .buttonStyle(.plain)
+                .controlSize(.small)
+                .help(
+                    "Update all (\(updatableCount))")
             }
 
-            Button("Quit") {
+            Button {
                 NSApplication.shared.terminate(nil)
+            } label: {
+                Image(systemName: "power")
             }
-            .font(.system(size: 11))
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
+            .controlSize(.small)
+            .help("Quit MattsSoftware")
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+        .padding(.vertical, 9)
     }
 }
 
