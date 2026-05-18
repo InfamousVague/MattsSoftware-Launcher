@@ -22,7 +22,7 @@ repo (`mattssoftware-launcher`) is the hub.
 | Sentry | `sentry-swift` | `InfamousVague/Sentry` | Swift menu-bar | — | GitHub `.dmg` |
 | Peephole | `peephole-swift` | `InfamousVague/Peephole` | Swift menu-bar | — | GitHub `.dmg` |
 | Port | `port-swift` | `InfamousVague/Port` | Swift menu-bar | — | GitHub `.dmg` |
-| Blip | `Blip` | `InfamousVague/Blip` | Tauri (+ Network Extension) | `com.infamousvague.blip` | GitHub `.dmg` via **CI** |
+| Blip | `Blip` | `InfamousVague/Blip` | Tauri (+ Network Extension) | `com.infamousvague.blip` | GitHub `.dmg` via **local `make all` + manual upload** (CI can't build it — see §6.10) |
 | Diane | `diane` | `InfamousVague/Diane` | Tauri | `com.mattssoftware.diane` | GitHub `.dmg` |
 | Stash | `stash` | `InfamousVague/Stash` | Tauri (+ relay, watch, mobile, StashBar) | `com.mattssoftware.stash` | GitHub `.dmg` |
 | Libre | `Libre.academy` | `InfamousVague/Libre.academy` | Tauri | `com.mattssoftware.libre` | GitHub `.dmg` via **CI** + Tauri OTA |
@@ -106,11 +106,15 @@ make notarize                 # notarize+staple an existing build
 - **Stash / Libre**: `make local-release` uses `.env.apple`. Both
   also have a `post-build.sh` (hardened-runtime re-sign + rebuild
   DMG).
-- **Blip**: releases via **GitHub Actions** (`.github/workflows/release.yml`)
-  on tag push — imports the cert from secrets, builds the Network
-  Extension, signs, notarizes, uploads. `make release` just
-  bumps/tags/pushes; CI does the rest. Blip commits its prebuilt NE
-  binaries (`src-tauri/resources/…`) — that's intentional.
+- **Blip**: `.github/workflows/release.yml` exists but **CI builds
+  fail** (§6.10) — Blip is released **locally**: `cd Blip && make all`
+  (build NE + Tauri, sign, notarize, install), then
+  `gh release create v<ver> <dmg> --latest`. `make local-release`
+  does bump+all+tag+push+release in one shot but **double-bumps** if
+  you already tagged via `make release` — prefer `make all` + manual
+  `gh release create` for an already-tagged version. Blip commits
+  its prebuilt NE binaries (`src-tauri/resources/blip-ne-*`,
+  `libblip_ne_bridge.dylib`, the `.systemextension`) — intentional.
 - **Libre**: `.github/workflows/desktop-build.yml` — matrix builds
   Linux/Windows on tag push; a dedicated **`macos-release`** job
   (added in this effort) builds + Developer-ID signs + runs
@@ -184,6 +188,16 @@ SwiftUI menu-bar app: `Bootstrap` entry → `MattsSoftwareMenuBarApp`
    Never commit or echo it.
 9. Repo-rename 301s work but point catalog/scripts at the canonical
    name where practical.
+10. **Blip CI cannot build a release.** `tauri-build`'s build script
+    validates every `bundle.resources` entry; Blip declares huge
+    geo/map files (`planet.pmtiles` 104M, `ocean.pmtiles` 78M,
+    `GeoLite2-City.mmdb` 61M, `dbip-city-lite.mmdb` 125M, …) that are
+    **not in git** (too big), so the CI checkout is missing them and
+    the build script exits 1 ("failed to run custom build command
+    for `app`"). Both v0.4.6 and v0.4.7 CI runs failed this way; the
+    shipped dmgs came from local builds. Always release Blip locally
+    (the resources live on the maintainer's machine). Don't "fix" CI
+    by committing 370MB of tiles.
 
 ---
 
