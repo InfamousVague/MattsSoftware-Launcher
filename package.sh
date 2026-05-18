@@ -20,7 +20,6 @@ cd "$(dirname "$0")"
 APP_NAME="MattsSoftware"
 BIN_NAME="MattsSoftwareMenuBar"
 BUNDLE_ID="com.mattssoftware.launcher"
-RES_BUNDLE="MattsSoftwareMenuBar_MattsSoftwareMenuBar.bundle"
 VERSION="$(tr -d ' \n' < VERSION 2>/dev/null || echo "0.1.0")"
 # Developer ID so the launcher can be notarized like the rest of
 # the menu-bar suite. Override with SIGN_IDENTITY=- for a purely
@@ -39,14 +38,14 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cp "$BIN_DIR/$BIN_NAME" "$APP/Contents/MacOS/$BIN_NAME"
 
-# Inside a .app, SwiftPM's `Bundle.module` resolves against
-# `Bundle.main.resourceURL` (= Contents/Resources), so the resource
-# bundle goes there and *only* there. Putting it next to the binary
-# in Contents/MacOS makes `codesign --deep` choke on it as an
-# unsignable subcomponent.
-if [ -d "$BIN_DIR/$RES_BUNDLE" ]; then
-  cp -R "$BIN_DIR/$RES_BUNDLE" "$APP/Contents/Resources/$RES_BUNDLE"
-fi
+# Row icons: copy the source PNGs straight into Contents/Resources
+# so the app loads them via Bundle.main. We deliberately do NOT use
+# SwiftPM's resource bundle — its generated Bundle.module accessor
+# fatalErrors when the bundle isn't found, and in a hand-assembled
+# .app it only ever resolved via a hardcoded dev `.build` path, so
+# the app crashed on first popover render on every other machine.
+cp Sources/MattsSoftwareMenuBar/Resources/*.png \
+   "$APP/Contents/Resources/"
 
 # The MattsSoftware mark in Finder / Login Items / the about box.
 if [ -f "icon.icns" ]; then

@@ -264,17 +264,43 @@ enum Services {
 
     // MARK: Bundled icons
 
-    /// Real squircle icon for a catalog row, loaded from the
-    /// SwiftPM resource bundle. Cached so scrolling the list
-    /// doesn't re-decode.
     private static var iconCache: [String: NSImage] = [:]
 
+    /// Locate a bundled PNG WITHOUT SwiftPM's `Bundle.module`.
+    /// That accessor `fatalError`s when it can't find the resource
+    /// bundle, and in a hand-assembled .app it only ever resolved
+    /// via a hardcoded dev `.build` path — so any other machine
+    /// crashed on the first popover render. package.sh copies the
+    /// PNGs straight into the app's Contents/Resources, so look
+    /// there via Bundle.main first; the dev fallbacks cover
+    /// `swift run`. A miss returns nil — a blank icon, never a crash.
+    private static func iconURL(_ asset: String) -> URL? {
+        if let u = Bundle.main.url(
+            forResource: asset, withExtension: "png")
+        {
+            return u
+        }
+        let fm = FileManager.default
+        let exeDir = Bundle.main.executableURL?
+            .deletingLastPathComponent()
+        let sourceDir = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .appendingPathComponent("Resources")
+        let candidates = [
+            exeDir?.appendingPathComponent("\(asset).png"),
+            sourceDir.appendingPathComponent("\(asset).png"),
+        ]
+        return candidates
+            .compactMap { $0 }
+            .first { fm.fileExists(atPath: $0.path) }
+    }
+
+    /// Real squircle icon for a catalog row. Cached so scrolling
+    /// the list doesn't re-decode.
     static func appIcon(_ asset: String) -> NSImage? {
         if let hit = iconCache[asset] { return hit }
-        guard
-            let url = Bundle.module.url(
-                forResource: asset, withExtension: "png"),
-            let img = NSImage(contentsOf: url)
+        guard let url = iconURL(asset),
+              let img = NSImage(contentsOf: url)
         else { return nil }
         iconCache[asset] = img
         return img

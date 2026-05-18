@@ -10,12 +10,36 @@ import SwiftUI
 @main
 enum Bootstrap {
     static func main() {
-        if let id = ProcessInfo.processInfo
-            .environment["MS_INSTALL_TEST"], !id.isEmpty
-        {
+        let env = ProcessInfo.processInfo.environment
+        if let id = env["MS_INSTALL_TEST"], !id.isEmpty {
             InstallSelfTest.run(appId: id)  // calls exit(), never returns
         }
+        if env["MS_ICON_TEST"] != nil {
+            IconSelfTest.run()              // calls exit(), never returns
+        }
         MattsSoftwareMenuBarApp.main()
+    }
+}
+
+/// Headless check that every catalog icon (+ the brand mark)
+/// resolves from the app bundle with NO dependency on SwiftPM's
+/// `Bundle.module` / the dev `.build` dir — i.e. that it won't
+/// crash on another machine. Exits 0 only if all resolve. Driven
+/// by `MS_ICON_TEST`.
+enum IconSelfTest {
+    static func run() -> Never {
+        var missing: [String] = []
+        if Services.brandIcon == nil { missing.append("launcher") }
+        for app in CATALOG where Services.appIcon(app.iconAsset) == nil {
+            missing.append(app.iconAsset)
+        }
+        if missing.isEmpty {
+            print("✓ all \(CATALOG.count + 1) icons resolved "
+                + "from the app bundle (no Bundle.module)")
+            exit(0)
+        }
+        print("✗ unresolved icons: \(missing.joined(separator: ", "))")
+        exit(1)
     }
 }
 

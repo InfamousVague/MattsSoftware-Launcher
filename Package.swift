@@ -21,10 +21,18 @@ let package = Package(
         .executableTarget(
             name: "MattsSoftwareMenuBar",
             path: "Sources/MattsSoftwareMenuBar",
-            // The squircle app icons (+ the MattsSoftware brand
-            // mark) are bundled so every catalog row shows the real
-            // icon. Reached via `Bundle.module` at runtime.
-            resources: [.process("Resources")]
+            // NB: the squircle icons live in
+            // Sources/MattsSoftwareMenuBar/Resources/*.png but are
+            // deliberately NOT declared as SwiftPM `resources:`.
+            // SwiftPM's generated `Bundle.module` accessor
+            // fatalErrors when it can't find the resource bundle,
+            // and in a hand-assembled .app it only ever resolved
+            // via a hardcoded dev `.build` path — so the app
+            // crashed on the first popover render on every machine
+            // other than the one that ran `swift build`. package.sh
+            // copies the PNGs straight into Contents/Resources and
+            // the app loads them via Bundle.main instead.
+            exclude: ["Resources"]
         )
     ]
 )
