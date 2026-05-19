@@ -38,6 +38,16 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cp "$BIN_DIR/$BIN_NAME" "$APP/Contents/MacOS/$BIN_NAME"
 
+# Embed the shared SuiteKit contract. Every feature framework the
+# launcher loads at runtime (out of an installed app) resolves its
+# @rpath/libSuiteKit.dylib against THIS copy — dyld dedupes by
+# install name — so there's one shared SuitePane identity. The
+# rpath lets the bundled exe find it under Contents/Frameworks.
+mkdir -p "$APP/Contents/Frameworks"
+cp "$BIN_DIR/libSuiteKit.dylib" "$APP/Contents/Frameworks/"
+install_name_tool -add_rpath @executable_path/../Frameworks \
+  "$APP/Contents/MacOS/$BIN_NAME" 2>/dev/null || true
+
 # Row icons: copy the source PNGs straight into Contents/Resources
 # so the app loads them via Bundle.main. We deliberately do NOT use
 # SwiftPM's resource bundle — its generated Bundle.module accessor
@@ -91,6 +101,10 @@ sign_app() {
         | grep -q "$SIGN_IDENTITY"; then
     for i in 1 2; do
       xattr -cr "$APP" 2>/dev/null || true
+      codesign --force --options runtime --timestamp \
+        --sign "$SIGN_IDENTITY" \
+        "$APP/Contents/Frameworks/libSuiteKit.dylib" \
+        >/dev/null 2>&1 || true
       if codesign --force --options runtime --timestamp \
            --sign "$SIGN_IDENTITY" "$APP/Contents/MacOS/$BIN_NAME" \
            >/dev/null 2>&1 \
@@ -105,6 +119,9 @@ sign_app() {
   # Ad-hoc fallback (local-only; cannot be notarized).
   for i in 1 2; do
     xattr -cr "$APP" 2>/dev/null || true
+    codesign --force --sign - \
+      "$APP/Contents/Frameworks/libSuiteKit.dylib" \
+      >/dev/null 2>&1 || true
     if codesign --force --sign - "$APP" >/dev/null 2>&1 \
        && codesign --verify --strict "$APP" >/dev/null 2>&1; then
       return 0

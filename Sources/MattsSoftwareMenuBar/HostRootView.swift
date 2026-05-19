@@ -15,7 +15,7 @@ struct HostRootView: View {
             Divider()
             content
         }
-        .frame(width: 380)
+        .frame(width: 340)
     }
 
     // MARK: Switcher
@@ -113,6 +113,6 @@ struct HostRootView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
         }
-        .frame(width: 380, height: 320)
+        .frame(width: 340, height: 540)
     }
 }

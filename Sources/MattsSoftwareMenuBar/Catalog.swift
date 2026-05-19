@@ -168,20 +168,6 @@ let CATALOG: [CatalogApp] = [
         iconAsset: "alfred"
     ),
     CatalogApp(
-        id: "fishbones",
-        name: "Libre",
-        tagline: "Turn any technical book into an interactive course.",
-        category: .learning,
-        channel: .github,
-        // Canonical repo name. The old "Fishbones" still 301s here,
-        // but point straight at it so releases (incl. the new
-        // CI-built notarized macOS .dmg) resolve without a redirect.
-        githubRepo: "Libre",
-        url: nil,
-        bundleName: "Libre",
-        iconAsset: "fishbones"
-    ),
-    CatalogApp(
         id: "tap",
         name: "Tap",
         tagline: "The command remote for your infrastructure.",

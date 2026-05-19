@@ -24,7 +24,7 @@ struct SuiteSettingsView: View {
             Divider()
             footer
         }
-        .frame(width: 380, height: 540)
+        .frame(width: 340, height: 540)
     }
 
     private var header: some View {

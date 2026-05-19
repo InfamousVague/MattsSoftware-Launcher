@@ -37,11 +37,46 @@ final class SuiteHost {
     }
 
     nonisolated static let registry: [SuiteApp] = [
+        .init(id: "sentry", displayName: "Sentry",
+              bundleID: "com.mattssoftware.sentry",
+              appBundle: "Sentry.app",
+              paneLib: "libSentryPane.dylib",
+              devRepo: "sentry-swift"),
+        .init(id: "peephole", displayName: "Peephole",
+              bundleID: "com.mattssoftware.peephole",
+              appBundle: "Peephole.app",
+              paneLib: "libPeepholePane.dylib",
+              devRepo: "peephole-swift"),
+        .init(id: "port", displayName: "Port",
+              bundleID: "com.mattssoftware.port",
+              appBundle: "Port.app",
+              paneLib: "libPortPane.dylib",
+              devRepo: "port-swift"),
+        .init(id: "stats", displayName: "Stats",
+              bundleID: "com.mattssoftware.stats",
+              appBundle: "Stats.app",
+              paneLib: "libStatsPane.dylib",
+              devRepo: "stats-swift"),
+        .init(id: "quarantine", displayName: "Quarantine",
+              bundleID: "com.mattssoftware.quarantine",
+              appBundle: "Quarantine.app",
+              paneLib: "libQuarantinePane.dylib",
+              devRepo: "quarantine-swift"),
         .init(id: "espresso", displayName: "Espresso",
               bundleID: "com.mattssoftware.espresso",
               appBundle: "Espresso.app",
               paneLib: "libEspressoPane.dylib",
-              devRepo: "espresso-swift")
+              devRepo: "espresso-swift"),
+        .init(id: "stickykeys", displayName: "StickyKeys",
+              bundleID: "com.mattssoftware.stickykeys",
+              appBundle: "StickyKeys.app",
+              paneLib: "libStickyKeysPane.dylib",
+              devRepo: "stickykeys-swift"),
+        .init(id: "alfred", displayName: "Alfred",
+              bundleID: "com.mattssoftware.alfred",
+              appBundle: "Alfred.app",
+              paneLib: "libAlfredPane.dylib",
+              devRepo: "Alfred")
     ]
 
     private(set) var entries: [Entry] = []
@@ -227,8 +262,51 @@ extension Color {
 
 /// Drops a pane's AppKit view (an `NSHostingView` over its own
 /// SwiftUI root) into the launcher's SwiftUI tree.
+///
+/// Switching segments keeps ONE `PaneContainer` (same SwiftUI
+/// identity), so SwiftUI calls `updateNSView`, not `makeNSView`.
+/// The old no-op `updateNSView` is why the body never changed until
+/// you bounced through the APPS tab (a different view type forced a
+/// rebuild). This hosts the pane inside a wrapper and swaps the
+/// child whenever the selected pane's view changes; the child is
+/// pinned on all edges so the wrapper inherits the pane's own
+/// fixed size (popover sizing unchanged).
+/// A plain wrapper that reports its hosted pane's size, so the
+/// NSPopover keeps sizing to the pane's own fixed frame.
+final class PaneWrapper: NSView {
+    override var intrinsicContentSize: NSSize {
+        subviews.first?.fittingSize ?? super.intrinsicContentSize
+    }
+}
+
 struct PaneContainer: NSViewRepresentable {
     let view: NSView
-    func makeNSView(context: Context) -> NSView { view }
-    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    func makeNSView(context: Context) -> NSView {
+        let wrapper = PaneWrapper()
+        install(view, in: wrapper)
+        return wrapper
+    }
+
+    func updateNSView(_ wrapper: NSView, context: Context) {
+        guard view.superview !== wrapper else { return }
+        wrapper.subviews.forEach { $0.removeFromSuperview() }
+        install(view, in: wrapper)
+    }
+
+    private func install(_ v: NSView, in wrapper: NSView) {
+        v.removeFromSuperview()
+        v.translatesAutoresizingMaskIntoConstraints = false
+        wrapper.addSubview(v)
+        NSLayoutConstraint.activate([
+            v.leadingAnchor.constraint(
+                equalTo: wrapper.leadingAnchor),
+            v.trailingAnchor.constraint(
+                equalTo: wrapper.trailingAnchor),
+            v.topAnchor.constraint(equalTo: wrapper.topAnchor),
+            v.bottomAnchor.constraint(
+                equalTo: wrapper.bottomAnchor),
+        ])
+        wrapper.invalidateIntrinsicContentSize()
+    }
 }

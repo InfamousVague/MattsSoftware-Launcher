@@ -20,7 +20,7 @@ struct MenuContentView: View {
             Divider()
             footer
         }
-        .frame(width: 380, height: 560)
+        .frame(width: 340, height: 540)
         .task {
             // The delegate warms this on launch; the guard just
             // covers the (unlikely) case the popover opens first.

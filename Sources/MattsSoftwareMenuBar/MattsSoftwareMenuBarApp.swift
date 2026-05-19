@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UserNotifications
 
 /// Process entry point. Normally just boots the SwiftUI app, but
 /// if `MS_INSTALL_TEST=<app-id>` is set it runs the real install
@@ -165,7 +166,7 @@ struct MattsSoftwareMenuBarApp: App {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate,
-    NSPopoverDelegate
+    NSPopoverDelegate, UNUserNotificationCenterDelegate
 {
     let state = AppState()
     let host = SuiteHost()
@@ -200,9 +201,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate,
             rootView: HostRootView(host: host).environmentObject(state)
         )
 
+        // One delegate for the whole merged suite: every absorbed
+        // pane posts notifications under this (single) bundle id, so
+        // the launcher routes a tap to the right pane.
+        UNUserNotificationCenter.current().delegate = self
+
         // Warm the catalog so the first popover open already shows
         // installed/update state instead of a flash of spinners.
         Task { await state.refresh() }
+    }
+
+    // MARK: - UNUserNotificationCenterDelegate (merged suite)
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler handler:
+            @escaping (UNNotificationPresentationOptions) -> Void
+    ) { handler([.banner, .list]) }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler handler: @escaping () -> Void
+    ) {
+        let info = response.notification.request.content.userInfo
+        let paneID = info["suitePane"] as? String
+        let focus = info["suiteFocus"] as? String
+        DispatchQueue.main.async {
+            if let paneID,
+               let entry = self.host.entries.first(where: {
+                   $0.id == paneID
+               }) {
+                self.host.selected = paneID
+                if let focus { entry.pane?.paneFocus?(focus) }
+            }
+            self.showPopover()
+        }
+        handler()
     }
 
     @objc private func togglePopover(_ sender: Any?) {
