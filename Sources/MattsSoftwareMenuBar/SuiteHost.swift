@@ -76,7 +76,12 @@ final class SuiteHost {
               bundleID: "com.mattssoftware.alfred",
               appBundle: "Alfred.app",
               paneLib: "libAlfredPane.dylib",
-              devRepo: "Alfred")
+              devRepo: "Alfred"),
+        .init(id: "stash", displayName: "Stash",
+              bundleID: "com.mattssoftware.stashbar",
+              appBundle: "StashBar.app",
+              paneLib: "libStashPane.dylib",
+              devRepo: "stash/native/StashBar")
     ]
 
     private(set) var entries: [Entry] = []
