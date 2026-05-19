@@ -34,6 +34,7 @@ APPS=(
   "Peephole|../peephole-swift|InfamousVague/Peephole"
   "Port|../port-swift|InfamousVague/Port"
   "StickyKeys|../stickykeys-swift|InfamousVague/StickyKeys"
+  "Stats|../stats-swift|InfamousVague/Stats"
   "MattsSoftware|.|InfamousVague/MattsSoftware-Launcher"
 )
 

@@ -146,6 +146,17 @@ let CATALOG: [CatalogApp] = [
         iconAsset: "quarantine"
     ),
     CatalogApp(
+        id: "stats",
+        name: "Stats",
+        tagline: "Live CPU, memory, disk, network & sensors in your menu bar.",
+        category: .utilities,
+        channel: .github,
+        githubRepo: "Stats",
+        url: nil,
+        bundleName: "Stats",
+        iconAsset: "stats"
+    ),
+    CatalogApp(
         id: "sentry",
         name: "Sentry",
         tagline: "Know the moment something digs in.",
