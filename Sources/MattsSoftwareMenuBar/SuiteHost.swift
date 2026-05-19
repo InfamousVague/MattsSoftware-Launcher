@@ -34,6 +34,10 @@ final class SuiteHost {
         let appBundle: String   // "Espresso.app"
         let paneLib: String     // "libEspressoPane.dylib"
         let devRepo: String     // sibling repo for the dev fallback
+        // Pane has no standalone download — it ships embedded in
+        // this host app's Resources (e.g. StashBar inside Stash.app),
+        // so the host app is the only thing the user installs.
+        var hostedIn: String? = nil
     }
 
     nonisolated static let registry: [SuiteApp] = [
@@ -81,7 +85,8 @@ final class SuiteHost {
               bundleID: "com.mattssoftware.stashbar",
               appBundle: "StashBar.app",
               paneLib: "libStashPane.dylib",
-              devRepo: "stash/native/StashBar")
+              devRepo: "stash/native/StashBar",
+              hostedIn: "Stash.app")
     ]
 
     private(set) var entries: [Entry] = []
@@ -102,10 +107,27 @@ final class SuiteHost {
 
     nonisolated private func resolveDylib(_ a: SuiteApp) -> URL? {
         let fm = FileManager.default
-        for d in ["/Applications", NSHomeDirectory() + "/Applications"] {
+        let appDirs = ["/Applications",
+                       NSHomeDirectory() + "/Applications"]
+        // 1) Installed as its own app.
+        for d in appDirs {
             let p = "\(d)/\(a.appBundle)/Contents/Frameworks/\(a.paneLib)"
             if fm.fileExists(atPath: p) { return URL(fileURLWithPath: p) }
         }
+        // 2) Embedded inside its host app's Resources — the host app
+        //    is the only thing the user installs (StashBar lives in
+        //    Stash.app and is Developer-ID signed by the same team,
+        //    so Library Validation still lets us dlopen it).
+        if let host = a.hostedIn {
+            for d in appDirs {
+                let p = "\(d)/\(host)/Contents/Resources/"
+                    + "\(a.appBundle)/Contents/Frameworks/\(a.paneLib)"
+                if fm.fileExists(atPath: p) {
+                    return URL(fileURLWithPath: p)
+                }
+            }
+        }
+        // 3) Dev fallback.
         let dev = "\(NSHomeDirectory())/Development/Apps/"
             + "\(a.devRepo)/.build/debug/\(a.paneLib)"
         if fm.fileExists(atPath: dev) { return URL(fileURLWithPath: dev) }
