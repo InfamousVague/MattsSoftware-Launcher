@@ -17,6 +17,9 @@ enum Bootstrap {
         if env["MS_ICON_TEST"] != nil {
             IconSelfTest.run()              // calls exit(), never returns
         }
+        if env["MS_SUITE_TEST"] != nil {
+            SuiteSelfTest.run()             // calls exit(), never returns
+        }
         MattsSoftwareMenuBarApp.main()
     }
 }
@@ -85,6 +88,41 @@ enum InstallSelfTest {
     }
 }
 
+/// Headless proof that the runtime pane loader works end-to-end:
+/// resolves each installed/dev pane dylib, dlopens it, casts through
+/// the shared SuiteKit contract, ABI-checks it, and builds its view.
+/// Prints one line per switcher entry then exits (0 = the Apps pane
+/// plus ≥1 feature pane loaded). Driven by `MS_SUITE_TEST`.
+enum SuiteSelfTest {
+    static func run() -> Never {
+        // NB: deliberately does NOT touch NSApplication.shared —
+        // initialising AppKit's app object in a headless,
+        // shell-launched process blocks on the window server.
+        MainActor.assumeIsolated {
+            let host = SuiteHost()
+            // activate:false — prove resolve+dlopen+cast+ABI without
+            // paneStart()/makeView() (hotkey taps & NSHostingView
+            // need the real run loop; that path runs in the GUI app).
+            host.loadPanes(mergedIDs: SuiteSettings.mergedIDs(),
+                           activate: false)
+            print("suite: \(host.entries.count) switcher entries")
+            for e in host.entries {
+                let kind = e.id == "apps" ? "builtin"
+                    : (e.needsUpdate ? "NEEDS-UPDATE" : "loaded")
+                let abi = e.pane.map { String($0.suiteABIVersion) } ?? "—"
+                print("  - \(e.id) [\(kind)] abi=\(abi) "
+                    + "tint=ok title=\(e.title)")
+            }
+            let features = host.entries.filter { $0.id != "apps" }
+            let ok = host.entries.contains { $0.id == "apps" }
+                && features.contains { !$0.needsUpdate && $0.pane != nil }
+            print(ok ? "✓ end-to-end pane load OK"
+                     : "✗ no feature pane loaded")
+            exit(ok ? 0 : 1)
+        }
+    }
+}
+
 /// App shell. Built the exact way every other MattsSoftware
 /// menu-bar app is (Sentry, Port, Peephole, …): an empty `Settings`
 /// scene plus an `NSApplicationDelegateAdaptor` that owns an
@@ -100,11 +138,19 @@ struct MattsSoftwareMenuBarApp: App {
         Settings { EmptyView() }
     }
 
-    /// Menu-bar glyph — `square.grid.2x2` echoes the launcher's
-    /// "grid of apps" mark. Set as a template so macOS tints it for
-    /// the active menu-bar appearance (dark on light bars, light on
-    /// dark), identical to the sibling apps' status glyphs.
+    /// Menu-bar glyph — the MattsSoftware `>|M` brandmark (white on
+    /// transparent), set as a template so macOS tints it for the
+    /// active menu-bar appearance (dark on light bars, light on
+    /// dark), identical to the sibling apps' status glyphs. Falls
+    /// back to `square.grid.2x2` only if the asset can't resolve.
     static let menuBarIcon: NSImage = {
+        if let mark = Services.appIcon("brandmark") {
+            let height: CGFloat = 15
+            let aspect = mark.size.width / max(mark.size.height, 1)
+            mark.size = NSSize(width: height * aspect, height: height)
+            mark.isTemplate = true
+            return mark
+        }
         let image = NSImage(
             systemSymbolName: "square.grid.2x2",
             accessibilityDescription: "MattsSoftware"
@@ -122,6 +168,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate,
     NSPopoverDelegate
 {
     let state = AppState()
+    let host = SuiteHost()
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
     /// Global click monitor used to dismiss the popover on any click
@@ -141,11 +188,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate,
             button.toolTip = "MattsSoftware — every app I've built"
         }
 
+        // Absorb installed panes the user has set to "merged"
+        // (default: merge everything we can find) before the first
+        // render so the switcher is populated immediately.
+        host.loadPanes(mergedIDs: SuiteSettings.mergedIDs())
+
         popover.behavior = .transient
         popover.animates = true
         popover.delegate = self
         popover.contentViewController = NSHostingController(
-            rootView: MenuContentView().environmentObject(state)
+            rootView: HostRootView(host: host).environmentObject(state)
         )
 
         // Warm the catalog so the first popover open already shows

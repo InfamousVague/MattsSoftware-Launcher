@@ -16,10 +16,23 @@ import PackageDescription
 // of Sendable ceremony here for no runtime benefit.
 let package = Package(
     name: "MattsSoftwareMenuBar",
-    platforms: [.macOS(.v13)],
+    // Bumped to v14: the launcher now hosts panes loaded from
+    // sibling apps (Espresso et al. are .v14) and uses Observation
+    // (@Observable SuiteHost), both of which require macOS 14.
+    platforms: [.macOS(.v14)],
+    dependencies: [
+        // The single shared contract. The launcher links it; every
+        // feature framework it loads at runtime resolves back to
+        // THIS image (dyld dedupes by the @rpath/libSuiteKit.dylib
+        // install name) so `loaded as? SuitePane` works.
+        .package(path: "../suitekit-swift")
+    ],
     targets: [
         .executableTarget(
             name: "MattsSoftwareMenuBar",
+            dependencies: [
+                .product(name: "SuiteKit", package: "suitekit-swift")
+            ],
             path: "Sources/MattsSoftwareMenuBar",
             // NB: the squircle icons live in
             // Sources/MattsSoftwareMenuBar/Resources/*.png but are

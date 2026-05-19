@@ -557,8 +557,9 @@ enum Services {
         return img
     }
 
-    /// MattsSoftware brand mark for the popover header.
-    static let brandIcon: NSImage? = appIcon("launcher")
+    /// MattsSoftware brand mark for the popover header — the `>|M`
+    /// wordmark glyph (white on transparent).
+    static let brandIcon: NSImage? = appIcon("brandmark")
 }
 
 /// Disk-backed cache of each repo's latest-release lookup, keyed by

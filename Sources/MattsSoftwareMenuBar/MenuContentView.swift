@@ -44,12 +44,14 @@ struct MenuContentView: View {
         HStack(alignment: .center) {
             HStack(alignment: .center, spacing: 6) {
                 if let icon = Services.brandIcon {
+                    // The `>|M` brandmark is a wide transparent glyph,
+                    // not a square app squircle — keep its aspect and
+                    // don't clip it into a rounded rect.
                     Image(nsImage: icon)
                         .resizable()
                         .interpolation(.high)
-                        .frame(width: 16, height: 16)
-                        .clipShape(
-                            RoundedRectangle(cornerRadius: 4))
+                        .scaledToFit()
+                        .frame(height: 14)
                 } else {
                     Image(systemName: "square.grid.2x2")
                         .font(.system(size: 13))
