@@ -82,10 +82,10 @@ final class SuiteHost {
               paneLib: "libAlfredPane.dylib",
               devRepo: "Alfred"),
         .init(id: "stash", displayName: "Stash",
-              bundleID: "com.mattssoftware.stashbar",
-              appBundle: "StashBar.app",
+              bundleID: "com.mattssoftware.stash",
+              appBundle: "Stash.app",
               paneLib: "libStashPane.dylib",
-              devRepo: "stash/native/StashBar",
+              devRepo: "stash/native/Stash",
               hostedIn: "Stash.app")
     ]
 
