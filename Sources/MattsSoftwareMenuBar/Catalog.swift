@@ -200,6 +200,17 @@ let CATALOG: [CatalogApp] = [
         bundleName: nil,
         iconAsset: "base"
     ),
+    CatalogApp(
+        id: "fetch",
+        name: "Fetch",
+        tagline: "A native torrent client for the public domain.",
+        category: .utilities,
+        channel: .github,
+        githubRepo: "Fetch",
+        url: nil,
+        bundleName: "Fetch",
+        iconAsset: "fetch"
+    ),
 ]
 
 /// Catalog grouped by category, in `AppCategory` declaration
