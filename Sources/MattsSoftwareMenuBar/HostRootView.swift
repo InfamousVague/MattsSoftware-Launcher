@@ -22,7 +22,7 @@ struct HostRootView: View {
 
     private var switcher: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 ForEach(host.entries) { e in
                     let on = host.selected == e.id
                     let isExternal = e.openURL != nil
@@ -33,26 +33,30 @@ struct HostRootView: View {
                         // launcher boot nothing was paneStart-ed.
                         else { host.openMerged(e.id) }
                     } label: {
-                        // Just the app's full-colour squircle PNG,
-                        // no chrome / cell padding. Unselected items
-                        // dim slightly so the active tab stands out
-                        // without a separate background ring.
-                        Image(nsImage: e.image)
-                            .resizable()
-                            .interpolation(.high)
-                            .scaledToFit()
-                            .frame(width: 40, height: 40)
-                            .clipShape(RoundedRectangle(
-                                cornerRadius: 14, style: .continuous))
-                            .opacity(on ? 1 : 0.78)
-                            .overlay(alignment: .topTrailing) {
-                                if e.needsUpdate {
-                                    Circle().fill(.orange)
-                                        .frame(width: 6, height: 6)
-                                        .offset(x: -1, y: 1)
-                                }
+                        // Browser-tab style: just the pane title.
+                        // Active tab gets an accent-coloured pill so
+                        // there's never any doubt which view you're
+                        // looking at; needs-update keeps its small
+                        // orange dot as a separate affordance.
+                        HStack(spacing: 4) {
+                            Text(e.title)
+                                .font(.system(
+                                    size: 11,
+                                    weight: on ? .semibold : .medium))
+                                .foregroundStyle(on
+                                    ? Color.white : Color.secondary)
+                                .lineLimit(1)
+                            if e.needsUpdate {
+                                Circle().fill(.orange)
+                                    .frame(width: 5, height: 5)
                             }
-                            .contentShape(Rectangle())
+                        }
+                        .padding(.horizontal, 10)
+                        .frame(height: 22)
+                        .background(
+                            on ? Color.accentColor : Color.clear,
+                            in: Capsule())
+                        .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
                     .help(isExternal
@@ -62,23 +66,26 @@ struct HostRootView: View {
                              : e.title))
                 }
 
-                Divider().frame(height: 22).padding(.horizontal, 2)
+                Divider().frame(height: 14).padding(.horizontal, 4)
 
                 let gearOn = host.selected == "settings"
                 Button { host.selected = "settings" } label: {
                     Image(systemName: "slider.horizontal.3")
-                        .resizable().scaledToFit()
-                        .frame(width: 22, height: 22)
-                        .frame(width: 40, height: 40)
+                        .font(.system(size: 12, weight: .medium))
+                        .padding(.horizontal, 8)
+                        .frame(height: 22)
                         .foregroundStyle(gearOn
-                                         ? Color.accentColor : .secondary)
-                        .contentShape(Rectangle())
+                            ? Color.white : Color.secondary)
+                        .background(
+                            gearOn ? Color.accentColor : Color.clear,
+                            in: Capsule())
+                        .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
                 .help("Merge settings — choose which apps fold in here")
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            .padding(.vertical, 8)
         }
     }
 
