@@ -115,6 +115,26 @@ final class SuiteHost {
     private(set) var entries: [Entry] = []
     var selected: String = "apps"
 
+    /// Diagnostic view of every pane we've successfully dlopen'd +
+    /// cast through SuiteKit, regardless of whether it's been
+    /// started / appears in the carousel. Drives `SuiteSelfTest`,
+    /// which proves the runtime-pane plumbing works without having
+    /// to paneStart (that needs a real run loop, not a shell-launched
+    /// headless invocation).
+    struct DiscoveredPane {
+        let id: String
+        let abiVersion: Int
+        let abiOK: Bool
+    }
+    var discoveredPanes: [DiscoveredPane] {
+        cache.map { id, l in
+            DiscoveredPane(
+                id: id,
+                abiVersion: Int(l.pane.suiteABIVersion),
+                abiOK: l.abiOK)
+        }.sorted { $0.id < $1.id }
+    }
+
     /// A pane that's been dlopen'd at least once. Reused on rebuild
     /// so toggling merge on/off never re-`dlopen`s or double-starts.
     private struct Loaded {
@@ -260,41 +280,36 @@ final class SuiteHost {
     func loadPanes(mergedIDs: Set<String>, activate: Bool = false) {
         var list: [Entry] = [appsEntry]
         for app in Self.registry {
-            guard let appURL = installedAppURL(app) else { continue }
-            let isMerged = mergedIDs.contains(app.id)
-            if isMerged, let l = ensureLoaded(app, activate: activate) {
-                // Carousel image is the playful-3D catalog squircle
-                // (bundled in the launcher), not the pane's tray
-                // glyph — so merged + external entries look uniform.
-                let img = Services.appIcon(app.id)
-                    ?? l.pane.paneMenuBarImage()
-                list.append(Entry(
-                    id: l.pane.paneID,
-                    title: l.pane.paneTitle,
-                    tint: Color(suiteHex: l.pane.paneTintHex)
-                          ?? .accentColor,
-                    image: img,
-                    view: l.abiOK ? l.view : nil,
-                    pane: l.abiOK ? l.pane : nil,
-                    openURL: nil,
-                    needsUpdate: !l.abiOK))
-            } else {
-                // Standalone OR merged-but-no-pane: external entry.
-                // Same playful-3D catalog squircle as merged entries
-                // so the carousel is a uniform strip of app icons.
-                let img = Services.appIcon(app.id)
-                    ?? NSImage(systemSymbolName: "app.fill",
-                               accessibilityDescription: app.displayName)
-                    ?? NSImage()
-                list.append(Entry(
-                    id: app.id,
-                    title: app.displayName.uppercased(),
-                    tint: .accentColor,
-                    image: img,
-                    view: nil, pane: nil,
-                    openURL: appURL,
-                    needsUpdate: false))
-            }
+            // Has to be installed (or dev-built) AND set to merged.
+            // Standalone-pinned apps live in their own menu-bar icon
+            // and never show up in the launcher's carousel — open
+            // them from there or from /Applications.
+            guard installedAppURL(app) != nil,
+                  mergedIDs.contains(app.id),
+                  let l = ensureLoaded(app, activate: activate)
+            else { continue }
+            // The carousel reads as a tab strip of *opened* panes —
+            // nothing shows up here until the user explicitly opens
+            // it (catalog Open, launching the .app, notification
+            // tap; all of those route through `openMerged(_:)`). The
+            // one exception: a needs-update pane surfaces immediately
+            // so the user actually finds out it's stale.
+            guard l.started || !l.abiOK else { continue }
+            // Carousel image is the playful-3D catalog squircle
+            // (bundled in the launcher), not the pane's tray glyph —
+            // keeps the strip a uniform row of full-colour icons.
+            let img = Services.appIcon(app.id)
+                ?? l.pane.paneMenuBarImage()
+            list.append(Entry(
+                id: l.pane.paneID,
+                title: l.pane.paneTitle,
+                tint: Color(suiteHex: l.pane.paneTintHex)
+                      ?? .accentColor,
+                image: img,
+                view: l.abiOK ? l.view : nil,
+                pane: l.abiOK ? l.pane : nil,
+                openURL: nil,
+                needsUpdate: !l.abiOK))
         }
         entries = list
         if !list.contains(where: { $0.id == selected }) {
@@ -320,18 +335,28 @@ final class SuiteHost {
     /// actually opens it (from the carousel, the catalog "Open"
     /// button, or by launching the .app from /Applications).
     ///
-    /// Built-in tabs (`apps`, `settings`) and external entries are
-    /// just selection — there's nothing to start.
+    /// Opening a pane also makes it appear in the carousel — that's
+    /// how the strip stays a clean "tabs you've opened" list rather
+    /// than a wall of every installed app.
     func openMerged(_ id: String) {
-        if id != "apps" && id != "settings",
-           let app = Self.registry.first(where: { $0.id == id }),
+        // Built-in tabs: just select them, nothing to start.
+        if id == "apps" || id == "settings" {
+            selected = id
+            return
+        }
+        // Merged registry app: lazily start, rebuild entries so the
+        // freshly-built view is wired in (cache is reused; no double
+        // dlopen / start), then select it.
+        if let app = Self.registry.first(where: { $0.id == id }),
            SuiteSettings.mergedIDs().contains(id) {
             _ = ensureLoaded(app, activate: true)
-            // Rebuild entries so the freshly-built view is wired into
-            // the switcher (cache is reused; no double dlopen/start).
             loadPanes(mergedIDs: SuiteSettings.mergedIDs())
+            selected = id
+            return
         }
-        selected = id
+        // Standalone-pinned or unknown id: no carousel entry exists
+        // for it — silently ignore rather than leave the launcher in
+        // a state where `selected` points at nothing.
     }
 
     /// Rebuild from the persisted setting (used after a toggle).

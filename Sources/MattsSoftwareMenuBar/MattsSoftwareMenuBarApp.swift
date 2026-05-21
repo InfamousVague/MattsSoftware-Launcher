@@ -107,17 +107,21 @@ enum SuiteSelfTest {
             // need the real run loop; that path runs in the GUI app).
             host.loadPanes(mergedIDs: SuiteSettings.mergedIDs(),
                            activate: false)
-            print("suite: \(host.entries.count) switcher entries")
-            for e in host.entries {
-                let kind = e.id == "apps" ? "builtin"
-                    : (e.needsUpdate ? "NEEDS-UPDATE" : "loaded")
-                let abi = e.pane.map { String($0.suiteABIVersion) } ?? "—"
-                print("  - \(e.id) [\(kind)] abi=\(abi) "
-                    + "tint=ok title=\(e.title)")
+            // The carousel is intentionally empty here — `entries`
+            // only lists panes the user has opened, and nothing has
+            // been opened in this headless run. We assert against
+            // `discoveredPanes` instead, which is the right signal:
+            // it shows everything we successfully dlopen'd + cast
+            // through the SuiteKit ABI without needing to start it.
+            let discovered = host.discoveredPanes
+            print("suite: \(host.entries.count) carousel entries, "
+                + "\(discovered.count) dlopen'd panes")
+            for d in discovered {
+                let kind = d.abiOK ? "loaded" : "NEEDS-UPDATE"
+                print("  - \(d.id) [\(kind)] abi=\(d.abiVersion)")
             }
-            let features = host.entries.filter { $0.id != "apps" }
             let ok = host.entries.contains { $0.id == "apps" }
-                && features.contains { !$0.needsUpdate && $0.pane != nil }
+                && discovered.contains { $0.abiOK }
             print(ok ? "✓ end-to-end pane load OK"
                      : "✗ no feature pane loaded")
             exit(ok ? 0 : 1)
