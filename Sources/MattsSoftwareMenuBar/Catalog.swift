@@ -102,17 +102,6 @@ let CATALOG: [CatalogApp] = [
         iconAsset: "stickykeys"
     ),
     CatalogApp(
-        id: "stash",
-        name: "Stash",
-        tagline: "Your .env files deserve a bodyguard.",
-        category: .developerTools,
-        channel: .github,
-        githubRepo: "Stash",
-        url: nil,
-        bundleName: "Stash",
-        iconAsset: "stash"
-    ),
-    CatalogApp(
         id: "port",
         name: "Port",
         tagline: "Every open port on your Mac, one click away.",

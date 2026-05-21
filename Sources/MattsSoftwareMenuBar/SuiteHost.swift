@@ -39,9 +39,11 @@ final class SuiteHost {
         let appBundle: String   // "Espresso.app"
         let paneLib: String     // "libEspressoPane.dylib"
         let devRepo: String     // sibling repo for the dev fallback
-        // Pane has no standalone download — it ships embedded in
-        // this host app's Resources (e.g. StashBar inside Stash.app),
-        // so the host app is the only thing the user installs.
+        // Pane has no standalone download — it ships embedded
+        // inside another app's Resources, so the host app is the
+        // only thing the user installs. Currently unused (no app
+        // in the registry needs this), but the resolveDylib path
+        // still honours it if a future entry sets it.
         var hostedIn: String? = nil
     }
 
@@ -85,13 +87,7 @@ final class SuiteHost {
               bundleID: "com.mattssoftware.alfred",
               appBundle: "Alfred.app",
               paneLib: "libAlfredPane.dylib",
-              devRepo: "Alfred"),
-        .init(id: "stash", displayName: "Stash",
-              bundleID: "com.mattssoftware.stash",
-              appBundle: "Stash.app",
-              paneLib: "libStashPane.dylib",
-              devRepo: "stash/native/Stash",
-              hostedIn: "Stash.app")
+              devRepo: "Alfred")
     ]
 
     /// Tray-style SF Symbol per app id — used to render the
@@ -109,7 +105,6 @@ final class SuiteHost {
         "quarantine": "square.and.arrow.down",
         "espresso":   "cup.and.saucer",
         "stickykeys": "keyboard",
-        "stash":      "lock.shield.fill",
     ]
 
     private(set) var entries: [Entry] = []
@@ -157,10 +152,10 @@ final class SuiteHost {
             let p = "\(d)/\(a.appBundle)/Contents/Frameworks/\(a.paneLib)"
             if fm.fileExists(atPath: p) { return URL(fileURLWithPath: p) }
         }
-        // 2) Embedded inside its host app's Resources — the host app
-        //    is the only thing the user installs (StashBar lives in
-        //    Stash.app and is Developer-ID signed by the same team,
-        //    so Library Validation still lets us dlopen it).
+        // 2) Embedded inside another app's Resources — the host app
+        //    is the only thing the user installs (Developer-ID signed
+        //    by the same team, so Library Validation still lets us
+        //    dlopen it). Unused right now; kept for future apps.
         if let host = a.hostedIn {
             for d in appDirs {
                 let p = "\(d)/\(host)/Contents/Resources/"
@@ -249,8 +244,9 @@ final class SuiteHost {
             if fm.fileExists(atPath: direct) {
                 return URL(fileURLWithPath: direct)
             }
-            // Embedded inside a host app (e.g. StashBar inside
-            // Stash.app's Resources) — still treat as installed.
+            // Embedded inside a host app's Resources — still
+            // treat that as "installed" (unused right now; kept
+            // for future entries that set `hostedIn`).
             if let host = a.hostedIn {
                 let nested = "\(d)/\(host)/Contents/Resources/\(a.appBundle)"
                 if fm.fileExists(atPath: nested) {
