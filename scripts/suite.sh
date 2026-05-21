@@ -61,10 +61,14 @@ ver() {  # current version of <key>
   fi
 }
 
-bump() {  # patch-bump <key>
+bump() {  # bump <key> — patch by default, semver-minor via BUMP=minor
   local k="$1" d cur new; d="$(appdir "$k")"
   cur="$(ver "$k")"
-  new="$(awk -F. '{printf "%d.%d.%d", $1, $2, $3 + 1}' <<<"$cur")"
+  case "${BUMP:-patch}" in
+    minor) new="$(awk -F. '{printf "%d.%d.0", $1, $2 + 1}' <<<"$cur")" ;;
+    patch) new="$(awk -F. '{printf "%d.%d.%d", $1, $2, $3 + 1}' <<<"$cur")" ;;
+    *) echo "unknown BUMP level: $BUMP (use patch | minor)" >&2; return 1 ;;
+  esac
   if [ "$k" = MattsSoftware ]; then
     printf '%s\n' "$new" > "$d/VERSION"
   else
