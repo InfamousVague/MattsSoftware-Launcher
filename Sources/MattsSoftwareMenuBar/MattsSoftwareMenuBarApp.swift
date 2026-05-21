@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import UserNotifications
+import CoreServices  // FSEvents — watch /Applications for live installs
 
 /// Process entry point. Normally just boots the SwiftUI app, but
 /// if `MS_INSTALL_TEST=<app-id>` is set it runs the real install
@@ -176,6 +177,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate,
     /// outside it — `.transient` alone is unreliable for `.accessory`
     /// apps once we `NSApp.activate`, so this is the backstop.
     private var clickMonitor: Any?
+    /// FSEvents watcher on /Applications + ~/Applications so a
+    /// freshly-installed suite app drops into the switcher live.
+    private var appsWatcher: FSEventStreamRef?
+    /// Debounces rapid filesystem bursts during install/uninstall.
+    private var reloadDebounce: DispatchWorkItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -191,8 +197,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate,
 
         // Absorb installed panes the user has set to "merged"
         // (default: merge everything we can find) before the first
-        // render so the switcher is populated immediately.
-        host.loadPanes(mergedIDs: SuiteSettings.mergedIDs())
+        // render so the switcher is populated immediately. `activate:
+        // false` means we discover + dlopen the panes (so the carousel
+        // knows their identity / ABI) but DO NOT call paneStart on
+        // them — none of the merged apps actually runs until the user
+        // explicitly opens it (carousel click, catalog Open, or
+        // launching the .app from /Applications).
+        host.loadPanes(mergedIDs: SuiteSettings.mergedIDs(),
+                       activate: false)
+
+        // Let the catalog's "Open" action skip the standalone bounce
+        // for merged apps — jump straight to that tab in our switcher
+        // and lazily fire up that pane's runtime as we land on it.
+        state.openMergedPane = { [weak self] paneID in
+            guard let self else { return }
+            self.host.openMerged(paneID)
+            self.showPopover()
+        }
+
+        // A merged pane (e.g. StickyKeys) may need a TCC permission
+        // bound to *this* process — prompt + guide a relaunch if so.
+        AccessibilityGate.ensureIfNeeded(mergedIDs: SuiteSettings.mergedIDs())
 
         popover.behavior = .transient
         popover.animates = true
@@ -209,6 +234,91 @@ final class AppDelegate: NSObject, NSApplicationDelegate,
         // Warm the catalog so the first popover open already shows
         // installed/update state instead of a flash of spinners.
         Task { await state.refresh() }
+
+        // Jump to the right tab when a merged suite app is opened
+        // (Finder, Dock, Spotlight, the catalog Open action — any
+        // path). The standalone shim exits via SuiteGuard; we react
+        // to NSWorkspace's launch notification to show our popover.
+        observeSuiteLaunches()
+
+        // Watch /Applications so a newly-installed app appears in
+        // the switcher without a launcher relaunch.
+        startAppsWatcher()
+    }
+
+    // MARK: - Live switcher reactions
+
+    private func observeSuiteLaunches() {
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didLaunchApplicationNotification,
+            object: nil, queue: .main
+        ) { [weak self] note in
+            guard let launched = note.userInfo?[
+                    NSWorkspace.applicationUserInfoKey
+                  ] as? NSRunningApplication,
+                  let bid = launched.bundleIdentifier,
+                  bid != "com.mattssoftware.launcher",
+                  let entry = SuiteHost.registry.first(where: {
+                      $0.bundleID == bid
+                  }),
+                  !SuiteSettings.isStandalone(entry.id)
+            else { return }
+            let paneID = entry.id
+            Task { @MainActor in
+                guard let self else { return }
+                // Launching the standalone .app counts as "the user
+                // wants to use this app" — so this is one of the few
+                // places that *should* fire up the merged pane.
+                // `openMerged` dlopens (if not already), paneStarts,
+                // rebuilds entries, and selects the tab — all the
+                // lazy-init in one call. Brand-new installs that
+                // weren't in the carousel yet get absorbed here too.
+                self.host.openMerged(paneID)
+                self.showPopover()
+            }
+        }
+    }
+
+    private func startAppsWatcher() {
+        let cb: FSEventStreamCallback = { _, ctx, _, _, _, _ in
+            guard let ctx else { return }
+            let me = Unmanaged<AppDelegate>
+                .fromOpaque(ctx).takeUnretainedValue()
+            DispatchQueue.main.async { me.scheduleReload() }
+        }
+        var ctx = FSEventStreamContext(
+            version: 0,
+            info: Unmanaged.passUnretained(self).toOpaque(),
+            retain: nil, release: nil, copyDescription: nil)
+        let paths = [
+            "/Applications",
+            NSHomeDirectory() + "/Applications",
+        ] as CFArray
+        guard let stream = FSEventStreamCreate(
+            nil, cb, &ctx, paths,
+            FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
+            1.0,
+            FSEventStreamCreateFlags(0))
+        else { return }
+        FSEventStreamSetDispatchQueue(stream, .main)
+        FSEventStreamStart(stream)
+        appsWatcher = stream
+    }
+
+    private func scheduleReload() {
+        reloadDebounce?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            // `activate: false` — a filesystem change (install /
+            // uninstall) refreshes the carousel but never spins up a
+            // pane's runtime on its own. Only the user opening one
+            // does that.
+            self.host.loadPanes(mergedIDs: SuiteSettings.mergedIDs(),
+                                activate: false)
+        }
+        reloadDebounce = item
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + 0.6, execute: item)
     }
 
     // MARK: - UNUserNotificationCenterDelegate (merged suite)
@@ -229,12 +339,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate,
         let paneID = info["suitePane"] as? String
         let focus = info["suiteFocus"] as? String
         DispatchQueue.main.async {
-            if let paneID,
-               let entry = self.host.entries.first(where: {
-                   $0.id == paneID
-               }) {
-                self.host.selected = paneID
-                if let focus { entry.pane?.paneFocus?(focus) }
+            if let paneID {
+                // Tapping the pane's own notification means the user
+                // wants to use it — lazily start it (no-op if already
+                // running) and route the optional focus hint.
+                self.host.openMerged(paneID)
+                if let focus,
+                   let entry = self.host.entries.first(where: {
+                       $0.id == paneID
+                   }) {
+                    entry.pane?.paneFocus?(focus)
+                }
             }
             self.showPopover()
         }

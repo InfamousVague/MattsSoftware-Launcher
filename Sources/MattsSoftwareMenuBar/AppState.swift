@@ -17,6 +17,13 @@ final class AppState: ObservableObject {
     /// so they run strictly FIFO, one at a time.
     private var installTail: Task<Void, Never> = Task {}
 
+    /// Set by `AppDelegate`: jump the launcher's switcher to a
+    /// merged pane (selecting its tab + showing the popover) instead
+    /// of bouncing through the standalone .app. Lets the catalog's
+    /// "Open" action route a merged app directly to its tab — no
+    /// brief standalone-launch flash.
+    var openMergedPane: ((String) -> Void)?
+
     func refresh() async {
         loading = true
         // Resolve every app concurrently, then publish together so
@@ -47,10 +54,11 @@ final class AppState: ObservableObject {
             break
         }
         let st = statuses[app.id]
-        // Installed + current → just open it.
+        // Installed + current → just open it (routed through
+        // openInstalled so merged panes jump to their tab).
         if st?.installed == true, st?.updatable == false,
-           let bn = app.bundleName {
-            Services.openApp(bn)
+           app.bundleName != nil {
+            openInstalled(app)
             return
         }
         guard let url = st?.downloadURL else {
@@ -80,6 +88,16 @@ final class AppState: ObservableObject {
     }
 
     func openInstalled(_ app: CatalogApp) {
+        // If this app is a SuiteKit pane AND set to Merged, jump
+        // straight to its tab inside the launcher — no standalone
+        // .app bounce. Standalone-pinned apps fall through to the
+        // normal NSWorkspace open.
+        if SuiteHost.registry.contains(where: { $0.id == app.id }),
+           !SuiteSettings.isStandalone(app.id),
+           let jump = openMergedPane {
+            jump(app.id)
+            return
+        }
         if let bn = app.bundleName { Services.openApp(bn) }
     }
 

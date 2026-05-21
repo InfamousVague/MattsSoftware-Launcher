@@ -25,49 +25,54 @@ struct HostRootView: View {
             HStack(spacing: 6) {
                 ForEach(host.entries) { e in
                     let on = host.selected == e.id
+                    let isExternal = e.openURL != nil
                     Button {
-                        host.selected = e.id
+                        if isExternal { host.openExternal(e.id) }
+                        // openMerged lazily fires up the pane's
+                        // runtime the first time it's opened — at
+                        // launcher boot nothing was paneStart-ed.
+                        else { host.openMerged(e.id) }
                     } label: {
+                        // Just the app's full-colour squircle PNG,
+                        // no chrome / cell padding. Unselected items
+                        // dim slightly so the active tab stands out
+                        // without a separate background ring.
                         Image(nsImage: e.image)
-                            .renderingMode(.template)
                             .resizable()
+                            .interpolation(.high)
                             .scaledToFit()
-                            .frame(width: 15, height: 15)
-                            .frame(width: 34, height: 26)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(on ? e.tint.opacity(0.22)
-                                             : Color.clear))
-                            .foregroundStyle(on ? e.tint : .secondary)
+                            .frame(width: 40, height: 40)
+                            .clipShape(RoundedRectangle(
+                                cornerRadius: 14, style: .continuous))
+                            .opacity(on ? 1 : 0.78)
                             .overlay(alignment: .topTrailing) {
                                 if e.needsUpdate {
                                     Circle().fill(.orange)
-                                        .frame(width: 5, height: 5)
-                                        .offset(x: -3, y: 3)
+                                        .frame(width: 6, height: 6)
+                                        .offset(x: -1, y: 1)
                                 }
                             }
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .help(e.needsUpdate
-                          ? "\(e.title) — update it to use it here"
-                          : e.title)
+                    .help(isExternal
+                          ? "\(e.title) — open standalone"
+                          : (e.needsUpdate
+                             ? "\(e.title) — update it to use it here"
+                             : e.title))
                 }
 
-                Divider().frame(height: 16).padding(.horizontal, 2)
+                Divider().frame(height: 22).padding(.horizontal, 2)
 
                 let gearOn = host.selected == "settings"
                 Button { host.selected = "settings" } label: {
                     Image(systemName: "slider.horizontal.3")
                         .resizable().scaledToFit()
-                        .frame(width: 14, height: 14)
-                        .frame(width: 34, height: 26)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(gearOn
-                                      ? Color.accentColor.opacity(0.22)
-                                      : Color.clear))
+                        .frame(width: 22, height: 22)
+                        .frame(width: 40, height: 40)
                         .foregroundStyle(gearOn
                                          ? Color.accentColor : .secondary)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help("Merge settings — choose which apps fold in here")

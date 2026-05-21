@@ -13,15 +13,20 @@ import SuiteKit
 @Observable
 final class SuiteHost {
 
-    /// One switcher slot: the built-in Apps pane, or a loaded
-    /// feature pane (or a stub when the installed app is too old).
+    /// One switcher slot: the built-in Apps pane, a loaded feature
+    /// pane (merged, lives inside the launcher), or an "external"
+    /// installed app the user has pinned to Standalone — that one
+    /// has no in-process view; clicking it opens the .app.
     struct Entry: Identifiable {
         let id: String          // paneID, or "apps"
         let title: String
         let tint: Color
-        let image: NSImage      // template glyph for the segment
-        let view: NSView?       // nil ⇒ built-in Apps pane / needsUpdate
-        let pane: SuitePane?    // nil ⇒ built-in Apps pane / needsUpdate
+        let image: NSImage      // segment glyph
+        let view: NSView?       // nil ⇒ built-in / external / needsUpdate
+        let pane: SuitePane?    // nil ⇒ built-in / external / needsUpdate
+        /// Non-nil ⇒ external entry: clicking it opens the .app at
+        /// this URL (standalone-pinned apps route through this).
+        var openURL: URL? = nil
         var needsUpdate = false // ABI mismatch with this launcher
     }
 
@@ -87,6 +92,24 @@ final class SuiteHost {
               paneLib: "libStashPane.dylib",
               devRepo: "stash/native/Stash",
               hostedIn: "Stash.app")
+    ]
+
+    /// Tray-style SF Symbol per app id — used to render the
+    /// carousel segment for external (standalone-pinned) entries
+    /// without dlopening the pane. Keeps the carousel consistent:
+    /// every entry is a template glyph in the same visual family
+    /// as the menu-bar status item, not a mini full-colour squircle.
+    /// (Alfred has no SF analogue; it falls back to reading the
+    /// installed bundle's `Contents/Resources/MenuBarIcon.png`.)
+    nonisolated static let traySymbols: [String: String] = [
+        "sentry":     "shield.lefthalf.filled",
+        "peephole":   "eye.trianglebadge.exclamationmark",
+        "port":       "sailboat.fill",
+        "stats":      "waveform.path.ecg",
+        "quarantine": "square.and.arrow.down",
+        "espresso":   "cup.and.saucer",
+        "stickykeys": "keyboard",
+        "stash":      "lock.shield.fill",
     ]
 
     private(set) var entries: [Entry] = []
@@ -186,30 +209,92 @@ final class SuiteHost {
     }
 
     private var appsEntry: Entry {
-        Entry(id: "apps", title: "APPS", tint: .accentColor,
-              image: NSImage(systemSymbolName: "square.grid.2x2",
-                             accessibilityDescription: "Apps")
-                     ?? NSImage(),
-              view: nil, pane: nil)
+        // Home tab uses the MattsSoftware launcher squircle so the
+        // carousel reads as a uniform strip of full-colour app icons.
+        let img = Services.appIcon("launcher")
+            ?? NSImage(systemSymbolName: "square.grid.2x2",
+                       accessibilityDescription: "Apps")
+            ?? NSImage()
+        return Entry(id: "apps", title: "APPS", tint: .accentColor,
+                     image: img, view: nil, pane: nil)
     }
 
-    /// (Re)build the switcher list from the cache + the merge set.
-    /// `mergedIDs` is the user's setting — only those apps are
-    /// absorbed; the rest keep running standalone.
-    func loadPanes(mergedIDs: Set<String>, activate: Bool = true) {
+    /// Path to the installed .app bundle, if present. Used to gate
+    /// switcher inclusion (carousel only shows installed apps) and
+    /// to know what to NSWorkspace-open for external entries.
+    nonisolated func installedAppURL(_ a: SuiteApp) -> URL? {
+        let fm = FileManager.default
+        for d in ["/Applications", NSHomeDirectory() + "/Applications"] {
+            let direct = "\(d)/\(a.appBundle)"
+            if fm.fileExists(atPath: direct) {
+                return URL(fileURLWithPath: direct)
+            }
+            // Embedded inside a host app (e.g. StashBar inside
+            // Stash.app's Resources) — still treat as installed.
+            if let host = a.hostedIn {
+                let nested = "\(d)/\(host)/Contents/Resources/\(a.appBundle)"
+                if fm.fileExists(atPath: nested) {
+                    return URL(fileURLWithPath: nested)
+                }
+            }
+        }
+        return nil
+    }
+
+    /// (Re)build the switcher list from what's actually installed.
+    /// Each installed registry app appears in the carousel:
+    ///  • merged + pane loadable  →  full pane entry (click switches
+    ///    the host's content tab to it, in-process).
+    ///  • standalone (or merged but pane unavailable) → "external"
+    ///    entry (click opens the standalone .app, the launcher's
+    ///    `didLaunchApplication` observer takes over if it later
+    ///    needs to surface a tab).
+    /// Apps not in /Applications never show up — FSEvents on
+    /// /Applications drives reloads so this is live.
+    ///
+    /// `activate` is **false by default**: at launcher boot we want
+    /// every pane discoverable in the carousel, but none of them
+    /// actually *running* (no event taps, no timers, no observers)
+    /// until the user explicitly opens one. `openMerged(_:)` flips
+    /// activation on for a single pane the first time it's opened.
+    func loadPanes(mergedIDs: Set<String>, activate: Bool = false) {
         var list: [Entry] = [appsEntry]
-        for app in Self.registry where mergedIDs.contains(app.id) {
-            guard let l = ensureLoaded(app, activate: activate)
-            else { continue }
-            list.append(Entry(
-                id: l.pane.paneID,
-                title: l.pane.paneTitle,
-                tint: Color(suiteHex: l.pane.paneTintHex)
-                      ?? .accentColor,
-                image: l.pane.paneMenuBarImage(),
-                view: l.abiOK ? l.view : nil,
-                pane: l.abiOK ? l.pane : nil,
-                needsUpdate: !l.abiOK))
+        for app in Self.registry {
+            guard let appURL = installedAppURL(app) else { continue }
+            let isMerged = mergedIDs.contains(app.id)
+            if isMerged, let l = ensureLoaded(app, activate: activate) {
+                // Carousel image is the playful-3D catalog squircle
+                // (bundled in the launcher), not the pane's tray
+                // glyph — so merged + external entries look uniform.
+                let img = Services.appIcon(app.id)
+                    ?? l.pane.paneMenuBarImage()
+                list.append(Entry(
+                    id: l.pane.paneID,
+                    title: l.pane.paneTitle,
+                    tint: Color(suiteHex: l.pane.paneTintHex)
+                          ?? .accentColor,
+                    image: img,
+                    view: l.abiOK ? l.view : nil,
+                    pane: l.abiOK ? l.pane : nil,
+                    openURL: nil,
+                    needsUpdate: !l.abiOK))
+            } else {
+                // Standalone OR merged-but-no-pane: external entry.
+                // Same playful-3D catalog squircle as merged entries
+                // so the carousel is a uniform strip of app icons.
+                let img = Services.appIcon(app.id)
+                    ?? NSImage(systemSymbolName: "app.fill",
+                               accessibilityDescription: app.displayName)
+                    ?? NSImage()
+                list.append(Entry(
+                    id: app.id,
+                    title: app.displayName.uppercased(),
+                    tint: .accentColor,
+                    image: img,
+                    view: nil, pane: nil,
+                    openURL: appURL,
+                    needsUpdate: false))
+            }
         }
         entries = list
         if !list.contains(where: { $0.id == selected }) {
@@ -217,7 +302,41 @@ final class SuiteHost {
         }
     }
 
+    /// Launches the external app behind the given entry id (a
+    /// standalone-pinned suite app). No-op if the entry isn't
+    /// external or the app vanished between the click and now.
+    func openExternal(_ id: String) {
+        guard let entry = entries.first(where: { $0.id == id }),
+              let url = entry.openURL else { return }
+        NSWorkspace.shared.openApplication(
+            at: url,
+            configuration: NSWorkspace.OpenConfiguration())
+    }
+
+    /// Switch to a switcher entry, lazily starting its pane the first
+    /// time it's opened. This is the **only** path that should call
+    /// `paneStart()` — boot, FSEvents reloads, and merge toggles all
+    /// stay inert so an installed pane never runs until the user
+    /// actually opens it (from the carousel, the catalog "Open"
+    /// button, or by launching the .app from /Applications).
+    ///
+    /// Built-in tabs (`apps`, `settings`) and external entries are
+    /// just selection — there's nothing to start.
+    func openMerged(_ id: String) {
+        if id != "apps" && id != "settings",
+           let app = Self.registry.first(where: { $0.id == id }),
+           SuiteSettings.mergedIDs().contains(id) {
+            _ = ensureLoaded(app, activate: true)
+            // Rebuild entries so the freshly-built view is wired into
+            // the switcher (cache is reused; no double dlopen/start).
+            loadPanes(mergedIDs: SuiteSettings.mergedIDs())
+        }
+        selected = id
+    }
+
     /// Rebuild from the persisted setting (used after a toggle).
+    /// Inert by default — no pane is paneStart-ed here; the user has
+    /// to actually open one via `openMerged(_:)`.
     func reload() { loadPanes(mergedIDs: SuiteSettings.mergedIDs()) }
 
     // MARK: Merge toggle + standalone coordination
@@ -230,7 +349,10 @@ final class SuiteHost {
         SuiteSettings.setStandalone(app.id, !merged)
         if merged {
             terminateStandalone(app)          // no duplicate icon
-            _ = ensureLoaded(app, activate: true)
+            // Lazy: dlopen so the carousel knows about it (and can
+            // flag ABI mismatch), but don't paneStart — the user has
+            // to actually open it for the runtime to fire up.
+            _ = ensureLoaded(app, activate: false)
         } else {
             if let c = cache[app.id], c.started {
                 c.pane.paneStop()
