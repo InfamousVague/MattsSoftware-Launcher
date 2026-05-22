@@ -35,6 +35,7 @@ APPS=(
   "Port|../port-swift|InfamousVague/Port"
   "StickyKeys|../stickykeys-swift|InfamousVague/StickyKeys"
   "Stats|../stats-swift|InfamousVague/Stats"
+  "Uninstaller|../uninstaller-swift|InfamousVague/Uninstaller"
   "MattsSoftware|.|InfamousVague/MattsSoftware-Launcher"
 )
 

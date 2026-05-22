@@ -168,6 +168,17 @@ let CATALOG: [CatalogApp] = [
         iconAsset: "alfred"
     ),
     CatalogApp(
+        id: "uninstaller",
+        name: "Uninstaller",
+        tagline: "Apps + their crumbs, in one click.",
+        category: .utilities,
+        channel: .github,
+        githubRepo: "Uninstaller",
+        url: nil,
+        bundleName: "Uninstaller",
+        iconAsset: "uninstaller"
+    ),
+    CatalogApp(
         id: "tap",
         name: "Tap",
         tagline: "The command remote for your infrastructure.",

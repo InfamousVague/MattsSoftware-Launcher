@@ -87,7 +87,12 @@ final class SuiteHost {
               bundleID: "com.mattssoftware.alfred",
               appBundle: "Alfred.app",
               paneLib: "libAlfredPane.dylib",
-              devRepo: "Alfred")
+              devRepo: "Alfred"),
+        .init(id: "uninstaller", displayName: "Uninstaller",
+              bundleID: "com.mattssoftware.uninstaller",
+              appBundle: "Uninstaller.app",
+              paneLib: "libUninstallerPane.dylib",
+              devRepo: "uninstaller-swift")
     ]
 
     /// Tray-style SF Symbol per app id — used to render the
@@ -105,6 +110,7 @@ final class SuiteHost {
         "quarantine": "square.and.arrow.down",
         "espresso":   "cup.and.saucer",
         "stickykeys": "keyboard",
+        "uninstaller": "trash.fill",
     ]
 
     private(set) var entries: [Entry] = []
