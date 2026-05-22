@@ -80,6 +80,12 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSSupportsAutomaticTermination</key><false/>
+  <!-- Used by the Uninstaller pane (when merged into the launcher)
+       so Finder can move /Applications/<App>.app to Trash on the
+       launcher's behalf. First uninstall triggers a one-time
+       "MattsSoftware would like to control Finder" prompt. -->
+  <key>NSAppleEventsUsageDescription</key>
+  <string>MattsSoftware asks Finder to move apps and their leftover files to the Trash on your behalf when you use the Uninstaller pane.</string>
 </dict>
 </plist>
 PLIST
