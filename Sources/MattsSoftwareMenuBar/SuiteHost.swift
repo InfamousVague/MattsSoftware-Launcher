@@ -92,7 +92,18 @@ final class SuiteHost {
               bundleID: "com.mattssoftware.uninstaller",
               appBundle: "Uninstaller.app",
               paneLib: "libUninstallerPane.dylib",
-              devRepo: "uninstaller-swift")
+              devRepo: "uninstaller-swift"),
+        // Tap's desktop port lives in the cross-platform monorepo at
+        // `tap/macos/`, not its own peer Swift package — the dev
+        // fallback dylib resolves through `tap/macos/.build/debug`.
+        // Installed bundle is at `/Applications/Tap.app` exactly like
+        // every other suite app, so the primary resolveDylib branch
+        // covers the production path.
+        .init(id: "tap", displayName: "Tap",
+              bundleID: "com.mattssoftware.tap",
+              appBundle: "Tap.app",
+              paneLib: "libTapPane.dylib",
+              devRepo: "tap/macos")
     ]
 
     /// Tray-style SF Symbol per app id — used to render the
@@ -111,6 +122,10 @@ final class SuiteHost {
         "espresso":   "cup.and.saucer",
         "stickykeys": "keyboard",
         "uninstaller": "trash.fill",
+        // Same SF Symbol the pane vends from `paneMenuBarImage()`,
+        // so standalone-pinned Tap still reads as "instant remote
+        // action" in the carousel chip strip.
+        "tap":        "bolt.horizontal.circle",
     ]
 
     private(set) var entries: [Entry] = []

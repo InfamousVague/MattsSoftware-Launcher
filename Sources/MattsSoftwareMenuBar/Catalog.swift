@@ -179,14 +179,21 @@ let CATALOG: [CatalogApp] = [
         iconAsset: "uninstaller"
     ),
     CatalogApp(
+        // Tap was App Store–only when only the watchOS / iOS apps
+        // shipped. Post-desktop-port, Tap.app is a Developer-ID
+        // signed Mac binary that the launcher absorbs the same way
+        // as every other suite pane (libTapPane.dylib), so flip the
+        // channel to .github and set the bundle name. The watchOS /
+        // iOS apps continue to live at the App Store URL but the
+        // launcher's row now installs / opens the Mac build.
         id: "tap",
         name: "Tap",
         tagline: "The command remote for your infrastructure.",
         category: .developerTools,
-        channel: .appstore,
-        githubRepo: nil,
-        url: "https://apps.apple.com/app/tap-command-runner/id6762214314",
-        bundleName: nil,
+        channel: .github,
+        githubRepo: "Tap",
+        url: nil,
+        bundleName: "Tap",
         iconAsset: "tap"
     ),
     CatalogApp(
@@ -199,6 +206,17 @@ let CATALOG: [CatalogApp] = [
         url: "https://github.com/InfamousVague",
         bundleName: nil,
         iconAsset: "base"
+    ),
+    CatalogApp(
+        id: "libre",
+        name: "Libre",
+        tagline: "Turn any technical book into an interactive course.",
+        category: .learning,
+        channel: .github,
+        githubRepo: "Libre",
+        url: nil,
+        bundleName: "Libre",
+        iconAsset: "libre"
     ),
 ]
 
