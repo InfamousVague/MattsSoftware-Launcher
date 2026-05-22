@@ -15,7 +15,10 @@ struct HostRootView: View {
             Divider()
             content
         }
-        .frame(width: 340)
+        // Matches MenuContentView's 380 so the catalog grid fits
+        // 4 columns. Merged panes (340pt internally) keep their
+        // own width and centre inside the wider popover envelope.
+        .frame(width: 380)
     }
 
     // MARK: Switcher

@@ -35,7 +35,11 @@ struct MenuContentView: View {
             Divider()
             footer
         }
-        .frame(width: 340, height: 540)
+        // 380 instead of 340 so the LazyVGrid lands on 4 columns
+        // at the current cell-min of 76pt + 12pt padding/spacing.
+        // At 340 there's only room for 3 — adaptive falls back
+        // because 4×76 + 3×12 + 24 padding doesn't fit.
+        .frame(width: 380, height: 540)
         .task {
             if state.statuses.isEmpty { await state.refresh() }
         }
