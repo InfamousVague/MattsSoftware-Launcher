@@ -1,29 +1,42 @@
 import AppKit
 import SwiftUI
 
-/// The popover panel — the whole app's UI. Every catalogued app as
-/// a row with its live status, the real squircle icon, and one
-/// smart action (Install / Update / Open / App Store / Source).
-/// Visual language is shared 1:1 with the other MattsSoftware
-/// menu-bar apps (Sentry, Port, Peephole, …): fixed-width panel,
-/// uppercase tracked header, pinned category section headers on
-/// `.ultraThinMaterial`, monospaced metadata, understated plain
-/// footer controls.
+/// The popover panel — Launchpad-style grid of every catalogued app.
+/// Each cell is a squircle icon with the app name beneath; tapping
+/// runs the smart action (Install / Update / Open / App Store /
+/// Source) and a long-press / right-click surfaces the full menu
+/// (Reinstall, View releases, Uninstall, …).
+///
+/// Two sections so the user can scan their installed apps at a
+/// glance without scrolling past the unfamiliar ones:
+///   • Installed — apps where `status.installed == true`
+///   • Available — everything else (not yet installed, or status
+///     not yet known on first popover open)
+///
+/// Update affordance: each tile carries a small "↓" badge in the
+/// top-right corner when the catalog has flagged an update —
+/// no extra text, just an iconographic hint matching macOS
+/// Tahoe's App Store style.
 struct MenuContentView: View {
     @EnvironmentObject private var state: AppState
+
+    /// 4 columns × 56pt icons fits the 340-wide popover with room
+    /// for two-line names underneath without horizontal scrolling.
+    private let columns = [
+        GridItem(.adaptive(minimum: 76, maximum: 90),
+                 spacing: 12, alignment: .top)
+    ]
 
     var body: some View {
         VStack(spacing: 0) {
             header
             Divider()
-            list
+            grid
             Divider()
             footer
         }
         .frame(width: 340, height: 540)
         .task {
-            // The delegate warms this on launch; the guard just
-            // covers the (unlikely) case the popover opens first.
             if state.statuses.isEmpty { await state.refresh() }
         }
     }
@@ -44,9 +57,6 @@ struct MenuContentView: View {
         HStack(alignment: .center) {
             HStack(alignment: .center, spacing: 6) {
                 if let icon = Services.brandIcon {
-                    // The `>|M` brandmark is a wide transparent glyph,
-                    // not a square app squircle — keep its aspect and
-                    // don't clip it into a rounded rect.
                     Image(nsImage: icon)
                         .resizable()
                         .interpolation(.high)
@@ -62,10 +72,8 @@ struct MenuContentView: View {
                     .tracking(2)
                 if updatableCount > 0 {
                     PaddedCount(updatableCount)
-                        .font(
-                            .system(
-                                size: 9, weight: .bold,
-                                design: .rounded))
+                        .font(.system(size: 9, weight: .bold,
+                                      design: .rounded))
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
                         .background(Color.accentColor.opacity(0.22))
@@ -82,35 +90,54 @@ struct MenuContentView: View {
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                 Text(statusText)
-                    .font(
-                        .system(size: 10, design: .monospaced))
-                    .foregroundStyle(
-                        state.loading
-                            ? Color.accentColor : .secondary)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(state.loading
+                                     ? Color.accentColor : .secondary)
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
     }
 
-    // MARK: List
+    // MARK: Grid
 
-    private var list: some View {
-        ScrollView {
-            LazyVStack(
-                spacing: 0, pinnedViews: [.sectionHeaders]
-            ) {
-                ForEach(CATALOG_SECTIONS) { section in
+    /// Split the catalog into installed vs. everything else. Inside
+    /// each section, sort alphabetically by name so the layout
+    /// doesn't shuffle when the status set comes back from the
+    /// network refresh.
+    private var sortedSections: (installed: [CatalogApp],
+                                 available: [CatalogApp]) {
+        let installed = CATALOG.filter {
+            state.statuses[$0.id]?.installed == true
+        }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name)
+                    == .orderedAscending }
+        let installedIDs = Set(installed.map(\.id))
+        let available = CATALOG.filter {
+            !installedIDs.contains($0.id)
+        }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name)
+                    == .orderedAscending }
+        return (installed, available)
+    }
+
+    private var grid: some View {
+        let (installed, available) = sortedSections
+        return ScrollView {
+            LazyVStack(spacing: 0,
+                       pinnedViews: [.sectionHeaders]) {
+                if !installed.isEmpty {
                     Section {
-                        ForEach(section.apps) { app in
-                            AppRow(app: app)
-                                .environmentObject(state)
-                            Divider().opacity(0.4)
-                        }
+                        gridSection(installed)
                     } header: {
-                        sectionHeader(
-                            section.category.rawValue,
-                            count: section.apps.count)
+                        sectionHeader("Installed",
+                                      count: installed.count)
+                    }
+                }
+                if !available.isEmpty {
+                    Section {
+                        gridSection(available)
+                    } header: {
+                        sectionHeader("Available",
+                                      count: available.count)
                     }
                 }
             }
@@ -119,9 +146,19 @@ struct MenuContentView: View {
         .frame(maxHeight: .infinity)
     }
 
-    private func sectionHeader(
-        _ title: String, count: Int
-    ) -> some View {
+    private func gridSection(_ apps: [CatalogApp]) -> some View {
+        LazyVGrid(columns: columns, spacing: 14) {
+            ForEach(apps) { app in
+                AppTile(app: app)
+                    .environmentObject(state)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+    }
+
+    private func sectionHeader(_ title: String,
+                               count: Int) -> some View {
         HStack {
             Text(title.uppercased())
                 .font(.system(size: 10, weight: .semibold))
@@ -129,10 +166,8 @@ struct MenuContentView: View {
                 .foregroundStyle(.secondary)
             Spacer()
             PaddedCount(count)
-                .font(
-                    .system(
-                        size: 10, weight: .medium,
-                        design: .monospaced))
+                .font(.system(size: 10, weight: .medium,
+                              design: .monospaced))
                 .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 14)
@@ -163,8 +198,7 @@ struct MenuContentView: View {
                     Image(systemName: "arrow.down.circle")
                 }
                 .controlSize(.small)
-                .help(
-                    "Update all (\(updatableCount))")
+                .help("Update all (\(updatableCount))")
             }
 
             Button {
@@ -180,48 +214,40 @@ struct MenuContentView: View {
     }
 }
 
-// MARK: - Row
+// MARK: - Tile
 
-private struct AppRow: View {
+/// One app in the grid. Squircle icon, name underneath, badges on
+/// the icon corners for state. Click = primary action (Install /
+/// Open / Update / etc.); right-click / long-press = full menu.
+private struct AppTile: View {
     let app: CatalogApp
     @EnvironmentObject private var state: AppState
 
     private var status: AppStatus? { state.statuses[app.id] }
     private var busyMsg: String? { state.busy[app.id] }
-
-    /// A message is showing at all (working OR a terminal
-    /// Failed/no-build notice). Either way the row shows the
-    /// message, never the button — so a click is never swallowed.
-    private var hasMessage: Bool { busyMsg != nil }
-
-    /// Actively working → show a spinner. Failed/“No macOS build”
-    /// are terminal notices (no spinner, tinted, self-clearing).
+    private var isInstalled: Bool { status?.installed == true }
+    private var isUpdatable: Bool { status?.updatable == true }
     private var isWorking: Bool {
         guard let b = busyMsg else { return false }
         return !b.hasPrefix("Failed") && !b.hasPrefix("No ")
     }
-
-    private var isBusy: Bool { isWorking }
-
-    /// An installed app we own the bundle for can be removed —
-    /// except the launcher itself (you don't trash MattsSoftware
-    /// from inside MattsSoftware) and non-installable channels.
+    private var hasError: Bool {
+        guard let b = busyMsg else { return false }
+        return b.hasPrefix("Failed") || b.hasPrefix("No ")
+    }
     private var canUninstall: Bool {
-        guard status?.installed == true, app.bundleName != nil,
+        guard isInstalled, app.bundleName != nil,
               app.id != "mattssoftware"
         else { return false }
         return app.channel == .github || app.channel == .dmg
     }
 
-    /// Confirm, then quit + Trash. NSAlert is modal on the main
-    /// thread, which is where SwiftUI button actions already run.
     private func confirmUninstall() {
         let a = NSAlert()
         a.alertStyle = .warning
         a.messageText = "Uninstall \(app.name)?"
-        a.informativeText =
-            "\(app.name) will be quit and moved to the Trash. "
-            + "You can put it back from the Trash later."
+        a.informativeText = "\(app.name) will be quit and moved to "
+            + "the Trash. You can put it back from the Trash later."
         a.addButton(withTitle: "Uninstall")
         a.addButton(withTitle: "Cancel")
         if a.runModal() == .alertFirstButtonReturn {
@@ -229,124 +255,85 @@ private struct AppRow: View {
         }
     }
 
-    /// Smart action label — the per-app action state machine.
-    private var actionLabel: String {
-        switch app.channel {
-        case .appstore: return "App Store"
-        case .library: return "Source"
-        case .github, .dmg: break
-        }
-        if status?.installed == true, status?.updatable == true {
-            return "Update"
-        }
-        if status?.installed == true { return "Open" }
-        if let s = status, s.error != nil, s.downloadURL == nil {
-            return "Retry"
-        }
-        return "Install"
-    }
-
-    /// Install / Update are the loud, get-the-app actions; the
-    /// rest (Open / Source / App Store) stay quiet bordered.
-    private var actionIsProminent: Bool {
-        actionLabel == "Install" || actionLabel == "Update"
-            || actionLabel == "Retry"
-    }
-
-    private var statusLine: String {
-        switch app.channel {
-        case .library: return "Design system · open source"
-        case .appstore: return "Apple Watch · Mac App Store"
-        case .github, .dmg: break
-        }
-        if let s = status {
-            if s.installed, s.updatable {
-                return
-                    "v\(s.installedVersion ?? "?")  →  \(s.latestVersion ?? "new")"
-            }
-            if s.installed {
-                let v = s.installedVersion ?? ""
-                return v.isEmpty
-                    ? "Installed · up to date"
-                    : "Installed · v\(v)"
-            }
-            if s.error != nil { return "Couldn't check GitHub" }
-            if let lv = s.latestVersion {
-                return "Not installed · latest \(lv)"
-            }
-        }
-        return "Not installed"
-    }
-
     private var releasesURL: String? {
         guard let repo = app.githubRepo else { return nil }
-        let full =
-            repo.contains("/") ? repo : "\(GITHUB_OWNER)/\(repo)"
+        let full = repo.contains("/")
+            ? repo : "\(GITHUB_OWNER)/\(repo)"
         return "https://github.com/\(full)/releases"
     }
 
-    @ViewBuilder private var iconView: some View {
+    @ViewBuilder private var icon: some View {
         if let img = Services.appIcon(app.iconAsset) {
             Image(nsImage: img)
                 .resizable()
                 .interpolation(.high)
-                .frame(width: 30, height: 30)
-                .clipShape(RoundedRectangle(cornerRadius: 7))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 7)
-                        .stroke(
-                            Color.primary.opacity(0.10),
-                            lineWidth: 0.5))
+                .scaledToFit()
+                .frame(width: 56, height: 56)
+                .clipShape(RoundedRectangle(
+                    cornerRadius: 13, style: .continuous))
         } else {
-            RoundedRectangle(cornerRadius: 7)
-                .fill(Color.secondary.opacity(0.15))
-                .frame(width: 30, height: 30)
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .fill(Color.secondary.opacity(0.18))
+                .frame(width: 56, height: 56)
                 .overlay(
                     Image(systemName: "app.dashed")
+                        .font(.system(size: 22))
                         .foregroundStyle(.secondary))
         }
     }
 
-    @ViewBuilder private var actionControl: some View {
-        if hasMessage {
-            // Always render the message — working (spinner) OR a
-            // terminal Failed / "No macOS build" notice. Never fall
-            // back to the button here, so a click is never silently
-            // swallowed (the bug behind "Update does nothing").
-            HStack(spacing: 5) {
-                if isWorking {
-                    ProgressView().controlSize(.small)
-                }
-                Text(busyMsg ?? "Working…")
-                    .font(.system(size: 10))
-                    .foregroundStyle(
-                        isWorking ? Color.secondary : Color.orange)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.trailing)
-            }
-            .frame(minWidth: 76, maxWidth: 150, alignment: .trailing)
-        } else {
-            Button(actionLabel) {
-                state.primaryAction(app)
-            }
-            .controlSize(.small)
-            .buttonStyle(.bordered)
-            .tint(
-                actionIsProminent
-                    ? Color.accentColor : Color.secondary
-            )
-            .fixedSize()
+    /// Tiny iconographic badge in the top-right corner of the icon.
+    /// One of three states max so the tile never gets cluttered:
+    /// working spinner → update arrow → error triangle.
+    @ViewBuilder private var statusBadge: some View {
+        if isWorking {
+            Circle()
+                .fill(.background)
+                .frame(width: 18, height: 18)
+                .overlay(
+                    ProgressView()
+                        .controlSize(.mini)
+                )
+                .overlay(Circle().stroke(
+                    Color.primary.opacity(0.12), lineWidth: 0.5))
+        } else if isUpdatable {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white, Color.accentColor)
+                .background(
+                    Circle()
+                        .fill(.background)
+                        .frame(width: 18, height: 18))
+        } else if hasError {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 14))
+                .foregroundStyle(.white, .orange)
+                .background(
+                    Circle()
+                        .fill(.background)
+                        .frame(width: 18, height: 18))
         }
     }
 
+    /// Tap action — matches the old row's primary button. Channels
+    /// that don't install (App Store / library) just open the URL.
+    private func primaryTap() {
+        guard busyMsg == nil else { return }  // already working
+        state.primaryAction(app)
+    }
+
     @ViewBuilder private var menuItems: some View {
-        if status?.installed == true, app.bundleName != nil {
+        if isInstalled, app.bundleName != nil {
             Button("Open") { state.openInstalled(app) }
         }
-        if app.channel == .github, status?.downloadURL != nil {
-            Button(
-                status?.installed == true ? "Reinstall" : "Install"
-            ) { state.primaryAction(app) }
+        if isUpdatable {
+            Button("Update") { state.primaryAction(app) }
+        } else if !isInstalled,
+                  app.channel == .github || app.channel == .dmg {
+            Button("Install") { state.primaryAction(app) }
+        } else if app.channel == .github,
+                  status?.downloadURL != nil, isInstalled {
+            Button("Reinstall") { state.primaryAction(app) }
         }
         if let r = releasesURL {
             Button("View releases on GitHub") {
@@ -360,62 +347,32 @@ private struct AppRow: View {
             }
         }
         if app.channel == .appstore || app.channel == .library,
-            let u = app.url
-        {
-            Button(
-                app.channel == .appstore
-                    ? "Open in App Store" : "Open source"
-            ) { Services.openExternal(u) }
+           let u = app.url {
+            Button(app.channel == .appstore
+                   ? "Open in App Store" : "Open source") {
+                Services.openExternal(u)
+            }
         }
     }
 
     var body: some View {
-        HStack(spacing: 10) {
-            iconView
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(app.name)
-                        .font(
-                            .system(size: 12, weight: .semibold))
-                        .lineLimit(1)
-                    if status?.updatable == true {
-                        Text("UPDATE")
-                            .font(.system(size: 8, weight: .bold))
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(
-                                Color.accentColor.opacity(0.20))
-                            .foregroundStyle(Color.accentColor)
-                            .clipShape(Capsule())
-                    }
-                }
-                Text(statusLine)
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(
-                        (status?.error != nil
-                            && status?.downloadURL == nil)
-                            ? Color.orange : .secondary
-                    )
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+        VStack(spacing: 4) {
+            ZStack(alignment: .topTrailing) {
+                icon
+                    .opacity(isInstalled || isWorking ? 1 : 0.92)
+                statusBadge
+                    .offset(x: 4, y: -4)
             }
-            Spacer(minLength: 8)
-            if canUninstall && !isBusy {
-                Button(action: confirmUninstall) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.borderless)
-                .help("Uninstall \(app.name)")
-            }
-            actionControl
+            Text(app.name)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: 76)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+        .onTapGesture { primaryTap() }
         .contextMenu { menuItems }
-        .help(app.tagline)
+        .help(busyMsg ?? app.tagline)
     }
 }
