@@ -21,71 +21,93 @@ struct HostRootView: View {
     // MARK: Switcher
 
     private var switcher: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 4) {
-                ForEach(host.entries) { e in
-                    let on = host.selected == e.id
-                    let isExternal = e.openURL != nil
-                    Button {
-                        if isExternal { host.openExternal(e.id) }
-                        // openMerged lazily fires up the pane's
-                        // runtime the first time it's opened — at
-                        // launcher boot nothing was paneStart-ed.
-                        else { host.openMerged(e.id) }
-                    } label: {
-                        // Browser-tab style: just the pane title.
-                        // Active tab gets an accent-coloured pill so
-                        // there's never any doubt which view you're
-                        // looking at; needs-update keeps its small
-                        // orange dot as a separate affordance.
-                        HStack(spacing: 4) {
-                            Text(e.title)
-                                .font(.system(
-                                    size: 11,
-                                    weight: on ? .semibold : .medium))
-                                .foregroundStyle(on
-                                    ? Color.white : Color.secondary)
-                                .lineLimit(1)
-                            if e.needsUpdate {
-                                Circle().fill(.orange)
-                                    .frame(width: 5, height: 5)
+        // ScrollViewReader so we can centre the active tab whenever
+        // the selection changes — particularly important when opening
+        // a fresh pane appends a new tab to the right edge that would
+        // otherwise be offscreen.
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(host.entries) { e in
+                        let on = host.selected == e.id
+                        let isExternal = e.openURL != nil
+                        Button {
+                            if isExternal { host.openExternal(e.id) }
+                            // openMerged lazily fires up the pane's
+                            // runtime the first time it's opened — at
+                            // launcher boot nothing was paneStart-ed.
+                            else { host.openMerged(e.id) }
+                        } label: {
+                            // Browser-tab style: just the pane title.
+                            // Active tab gets an accent-coloured pill
+                            // so there's never any doubt which view
+                            // you're looking at; needs-update keeps
+                            // its small orange dot beside the label.
+                            HStack(spacing: 4) {
+                                Text(e.title)
+                                    .font(.system(
+                                        size: 11,
+                                        weight: on ? .semibold : .medium))
+                                    .foregroundStyle(on
+                                        ? Color.white : Color.secondary)
+                                    .lineLimit(1)
+                                if e.needsUpdate {
+                                    Circle().fill(.orange)
+                                        .frame(width: 5, height: 5)
+                                }
                             }
+                            .padding(.horizontal, 10)
+                            .frame(height: 22)
+                            .background(
+                                on ? Color.accentColor : Color.clear,
+                                in: Capsule())
+                            .contentShape(Capsule())
                         }
-                        .padding(.horizontal, 10)
-                        .frame(height: 22)
-                        .background(
-                            on ? Color.accentColor : Color.clear,
-                            in: Capsule())
-                        .contentShape(Capsule())
+                        .buttonStyle(.plain)
+                        // Explicit id so ScrollViewReader.scrollTo
+                        // can find the tab even with ForEach's own
+                        // identity diffing (the two aren't the same).
+                        .id(e.id)
+                        .help(isExternal
+                              ? "\(e.title) — open standalone"
+                              : (e.needsUpdate
+                                 ? "\(e.title) — update it to use it here"
+                                 : e.title))
+                    }
+
+                    Divider().frame(height: 14).padding(.horizontal, 4)
+
+                    let gearOn = host.selected == "settings"
+                    Button { host.selected = "settings" } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 12, weight: .medium))
+                            .padding(.horizontal, 8)
+                            .frame(height: 22)
+                            .foregroundStyle(gearOn
+                                ? Color.white : Color.secondary)
+                            .background(
+                                gearOn ? Color.accentColor : Color.clear,
+                                in: Capsule())
+                            .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
-                    .help(isExternal
-                          ? "\(e.title) — open standalone"
-                          : (e.needsUpdate
-                             ? "\(e.title) — update it to use it here"
-                             : e.title))
+                    .id("settings")
+                    .help("Merge settings — choose which apps fold in here")
                 }
-
-                Divider().frame(height: 14).padding(.horizontal, 4)
-
-                let gearOn = host.selected == "settings"
-                Button { host.selected = "settings" } label: {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 12, weight: .medium))
-                        .padding(.horizontal, 8)
-                        .frame(height: 22)
-                        .foregroundStyle(gearOn
-                            ? Color.white : Color.secondary)
-                        .background(
-                            gearOn ? Color.accentColor : Color.clear,
-                            in: Capsule())
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .help("Merge settings — choose which apps fold in here")
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .onChange(of: host.selected) { _, newID in
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    proxy.scrollTo(newID, anchor: .center)
+                }
+            }
+            // First-render selection (e.g. the launcher boots with a
+            // pane already selected, or the popover reopens on a
+            // previously-opened tab) lands centred too.
+            .onAppear {
+                proxy.scrollTo(host.selected, anchor: .center)
+            }
         }
     }
 
