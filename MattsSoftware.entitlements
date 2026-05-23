@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MattsSoftware launcher host entitlements.
+
+  Sign in with Apple — when a merged pane (currently Tap, possibly
+  others later) calls `ASAuthorizationAppleIDProvider` in our
+  process, macOS reads the entitlement from THIS executable, not
+  the dlopen'd pane dylib's. Without it the request fails
+  immediately with AuthenticationServices error 1000
+  (ASAuthorizationError.unknown). The bundle id
+  `com.mattssoftware.launcher` must also have "Sign in with Apple"
+  enabled under its App ID at developer.apple.com — entitlement +
+  portal capability are both required.
+
+  No App Group here: per-pane Group Containers (e.g.
+  F6ZAL7ANAD.group.com.mattssoftware.tap) are accessed by the pane
+  code via the pane's own group identifier, which works as long as
+  the running process has the matching application-groups
+  entitlement — added per-pane if/when a merged pane needs to
+  *write* to its group from this process.
+
+  NOT sandboxed: the launcher needs broad filesystem access to
+  install / update sibling .app bundles.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.developer.applesignin</key>
+  <array>
+    <string>Default</string>
+  </array>
+</dict>
+</plist>

@@ -100,6 +100,10 @@ PLIST
 # first pass. Falls back to ad-hoc when SIGN_IDENTITY=- or the
 # Developer ID cert is absent (local-only; not notarizable).
 SIGNED_DEVID=0
+# Launcher host entitlements — Sign in with Apple (needed when a
+# merged pane like Tap calls ASAuthorizationAppleIDProvider in our
+# process; without this the SIWA flow fails with error 1000).
+HOST_ENT="$(dirname "$0")/MattsSoftware.entitlements"
 sign_app() {
   local i
   if [ "$SIGN_IDENTITY" != "-" ] \
@@ -112,9 +116,11 @@ sign_app() {
         "$APP/Contents/Frameworks/libSuiteKit.dylib" \
         >/dev/null 2>&1 || true
       if codesign --force --options runtime --timestamp \
+           --entitlements "$HOST_ENT" \
            --sign "$SIGN_IDENTITY" "$APP/Contents/MacOS/$BIN_NAME" \
            >/dev/null 2>&1 \
          && codesign --force --options runtime --timestamp \
+              --entitlements "$HOST_ENT" \
               --sign "$SIGN_IDENTITY" "$APP" >/dev/null 2>&1 \
          && codesign --verify --strict "$APP" >/dev/null 2>&1; then
         SIGNED_DEVID=1
