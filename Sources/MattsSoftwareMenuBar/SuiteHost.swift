@@ -99,8 +99,12 @@ final class SuiteHost {
         // Installed bundle is at `/Applications/Tap.app` exactly like
         // every other suite app, so the primary resolveDylib branch
         // covers the production path.
+        // Tap's bundle id is `.tap.macos` (not bare `.tap`) so the
+        // signed binary rides the existing developer-portal App ID
+        // that has Sign in with Apple + a Developer ID profile
+        // generated. Bare `.tap` stays the iOS/watchOS namespace.
         .init(id: "tap", displayName: "Tap",
-              bundleID: "com.mattssoftware.tap",
+              bundleID: "com.mattssoftware.tap.macos",
               appBundle: "Tap.app",
               paneLib: "libTapPane.dylib",
               devRepo: "tap/macos")
