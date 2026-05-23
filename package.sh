@@ -86,6 +86,25 @@ cat > "$APP/Contents/Info.plist" <<PLIST
        "MattsSoftware would like to control Finder" prompt. -->
   <key>NSAppleEventsUsageDescription</key>
   <string>MattsSoftware asks Finder to move apps and their leftover files to the Trash on your behalf when you use the Uninstaller pane.</string>
+  <!-- Desktop widget tap targets. Each pane's WidgetKit view
+       carries a `.widgetURL(URL(\"mattssoftware://<paneId>\"))`
+       so clicking it opens the launcher's popover with that
+       pane already selected. The launcher's AppDelegate's
+       `application(_:open:)` parses the host segment as the
+       pane id and routes via SuiteHost.openMerged + showPopover.
+       Without this URL types block macOS doesn't know which
+       app handles \`mattssoftware://\` and the widget tap is a no-op. -->
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key>
+      <string>com.mattssoftware.launcher.url</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>mattssoftware</string>
+      </array>
+    </dict>
+  </array>
 </dict>
 </plist>
 PLIST

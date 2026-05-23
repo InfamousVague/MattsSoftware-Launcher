@@ -368,6 +368,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate,
         }
     }
 
+    /// Handles `mattssoftware://<paneId>[/anything]` deep-links —
+    /// the URL grammar each app's WidgetKit view targets via
+    /// `widgetURL(...)`. Tapping a desktop widget launches the
+    /// launcher (or brings it forward if already running) and
+    /// macOS hands the URL here. We route to the right pane via
+    /// `SuiteHost.openMerged` and pop the popover so the user
+    /// lands exactly where they tapped.
+    ///
+    /// Grammar:
+    ///   - `mattssoftware://`              → just open the popover on whatever tab was last shown
+    ///   - `mattssoftware://tap`           → switch to Tap tab + open
+    ///   - `mattssoftware://alfred/open`   → same; the path component is reserved for future per-pane actions
+    ///
+    /// Unknown pane ids fall through to opening the popover on the
+    /// APPS catalog rather than leaving the launcher in a state
+    /// where `selected` points at nothing.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            guard url.scheme?.lowercased() == "mattssoftware" else { continue }
+            let paneID = url.host?.lowercased() ?? ""
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                if !paneID.isEmpty {
+                    // openMerged is a no-op for ids that aren't
+                    // currently in the merged set (standalone-
+                    // pinned panes / unknown ids); falling through
+                    // just shows the popover on whatever the last
+                    // selected tab was, which is the right thing
+                    // for a widget tap that isn't sure about its
+                    // merge state.
+                    self.host.openMerged(paneID)
+                }
+                self.showPopover()
+            }
+        }
+    }
+
     private func showPopover() {
         guard let button = statusItem.button else { return }
         popover.show(
