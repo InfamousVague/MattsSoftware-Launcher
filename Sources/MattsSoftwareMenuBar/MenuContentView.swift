@@ -20,10 +20,14 @@ import SwiftUI
 struct MenuContentView: View {
     @EnvironmentObject private var state: AppState
 
-    /// 4 columns × 56pt icons fits the 340-wide popover with room
-    /// for two-line names underneath without horizontal scrolling.
+    /// 4 columns × 48pt icons fits the 340-wide popover (which now
+    /// matches every merged pane's width, so the launcher stays a
+    /// single consistent size as the user switches tabs). Math:
+    /// 340 − 24 (horizontal padding) = 316 available; 4 cells at
+    /// min 68 + 3 gaps at 12 = 308, leaving an 8pt safety margin
+    /// before SwiftUI's adaptive layout would fall back to 3 cols.
     private let columns = [
-        GridItem(.adaptive(minimum: 76, maximum: 90),
+        GridItem(.adaptive(minimum: 68, maximum: 80),
                  spacing: 12, alignment: .top)
     ]
 
@@ -35,11 +39,12 @@ struct MenuContentView: View {
             Divider()
             footer
         }
-        // 380 instead of 340 so the LazyVGrid lands on 4 columns
-        // at the current cell-min of 76pt + 12pt padding/spacing.
-        // At 340 there's only room for 3 — adaptive falls back
-        // because 4×76 + 3×12 + 24 padding doesn't fit.
-        .frame(width: 380, height: 540)
+        // 340 to match every merged pane's intrinsic width — keeps
+        // the launcher one consistent size across tab switches so
+        // the popover doesn't visibly resize between APPS and the
+        // panes. Smaller cells (48pt icons, 68pt min cell) earn
+        // back the 4-column grid that used to need 380.
+        .frame(width: 340, height: 540)
         .task {
             if state.statuses.isEmpty { await state.refresh() }
         }
@@ -272,16 +277,16 @@ private struct AppTile: View {
                 .resizable()
                 .interpolation(.high)
                 .scaledToFit()
-                .frame(width: 56, height: 56)
+                .frame(width: 48, height: 48)
                 .clipShape(RoundedRectangle(
-                    cornerRadius: 13, style: .continuous))
+                    cornerRadius: 11, style: .continuous))
         } else {
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
                 .fill(Color.secondary.opacity(0.18))
-                .frame(width: 56, height: 56)
+                .frame(width: 48, height: 48)
                 .overlay(
                     Image(systemName: "app.dashed")
-                        .font(.system(size: 22))
+                        .font(.system(size: 19))
                         .foregroundStyle(.secondary))
         }
     }
@@ -372,7 +377,7 @@ private struct AppTile: View {
                 .foregroundStyle(.primary)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .frame(maxWidth: 76)
+                .frame(maxWidth: 68)
         }
         .contentShape(Rectangle())
         .onTapGesture { primaryTap() }
