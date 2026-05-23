@@ -15,14 +15,22 @@ struct HostRootView: View {
             Divider()
             content
         }
-        // No fixed width — each child dictates its own. The APPS
-        // catalog needs 380 to land the LazyVGrid on 4 columns;
+        // Width tracks the selected view: 380 on APPS so the
+        // LazyVGrid lands on 4 columns, 340 everywhere else so
         // merged panes (and the settings sheet, and the "needs
-        // update" notice) are natively 340. Letting each child set
-        // its own width means merged panes butt right up against
-        // the popover chrome instead of sitting centred in a 380
-        // envelope with 20pt of dead space on either side. The
-        // NSPopover smoothly resizes when the user switches tabs.
+        // update" notice) butt right up against the popover
+        // chrome instead of sitting centred with dead margin.
+        //
+        // Has to be explicit — removing it entirely makes the
+        // tab-bar `ScrollView(.horizontal)` report its inner
+        // HStack's natural width as its ideal, and SwiftUI picks
+        // the max of (tabs natural ~430, pane 340) for the VStack
+        // width. That's how the popover ended up *wider* than
+        // 380 once we had 5+ tabs and centred panes looked even
+        // worse. With this constraint back, the ScrollView is
+        // forced to actually scroll horizontally instead of
+        // claiming all the space it'd naturally want.
+        .frame(width: host.selected == "apps" ? 380 : 340)
     }
 
     // MARK: Switcher
