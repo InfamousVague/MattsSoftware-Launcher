@@ -15,10 +15,14 @@ struct HostRootView: View {
             Divider()
             content
         }
-        // Matches MenuContentView's 380 so the catalog grid fits
-        // 4 columns. Merged panes (340pt internally) keep their
-        // own width and centre inside the wider popover envelope.
-        .frame(width: 380)
+        // No fixed width — each child dictates its own. The APPS
+        // catalog needs 380 to land the LazyVGrid on 4 columns;
+        // merged panes (and the settings sheet, and the "needs
+        // update" notice) are natively 340. Letting each child set
+        // its own width means merged panes butt right up against
+        // the popover chrome instead of sitting centred in a 380
+        // envelope with 20pt of dead space on either side. The
+        // NSPopover smoothly resizes when the user switches tabs.
     }
 
     // MARK: Switcher
@@ -125,8 +129,12 @@ struct HostRootView: View {
             $0.id == host.selected
         }) {
             if let v = e.view {
+                // No `.frame(maxWidth: .infinity)` here — we want
+                // the pane's intrinsic 340 width to drive the
+                // popover so it butts right up against the chrome.
+                // Stretching to fill an outer envelope is what
+                // produced the "centred with 20pt margins" look.
                 PaneContainer(view: v)
-                    .frame(maxWidth: .infinity)
             } else {
                 needsUpdateNotice(e.title)
             }
