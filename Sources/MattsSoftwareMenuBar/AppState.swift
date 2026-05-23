@@ -26,21 +26,28 @@ final class AppState: ObservableObject {
 
     func refresh() async {
         loading = true
-        // Resolve every app concurrently, then publish together so
-        // the menu doesn't flicker row-by-row.
-        let resolved = await withTaskGroup(
+        // Publish each app's status as it lands instead of waiting
+        // for the whole batch. The old batched-at-end publish made
+        // every tile uninstallable until the slowest GitHub-API
+        // resolver returned — and a click before that landed dead-
+        // linked to the releases page through primaryAction's
+        // `guard st?.downloadURL else { openExternal(releases) }`
+        // fallback. With incremental publish, each tile becomes
+        // clickable the moment its own `resolveStatus` resolves
+        // (which is instant for any repo cached on disk). The
+        // Launchpad-grid badges absorb the per-tile state changes
+        // without the row-by-row visual jitter that the original
+        // batched-publish was preventing.
+        await withTaskGroup(
             of: (String, AppStatus).self
-        ) { group -> [String: AppStatus] in
+        ) { group in
             for app in CATALOG {
                 group.addTask {
                     (app.id, await Services.resolveStatus(app))
                 }
             }
-            var acc: [String: AppStatus] = [:]
-            for await (id, st) in group { acc[id] = st }
-            return acc
+            for await (id, st) in group { statuses[id] = st }
         }
-        statuses = resolved
         loading = false
         lastRefreshed = Date()
     }
