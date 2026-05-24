@@ -80,6 +80,23 @@ let CATALOG: [CatalogApp] = [
         iconAsset: "espresso"
     ),
     CatalogApp(
+        // Seasick — Apple's iPhone Motion Cues, ported to the Mac.
+        // Click-through particle overlay drifts opposite the
+        // device's tilt; reads SMS / AirPods / iPhone-companion
+        // motion. Standalone menu-bar agent, not a SuiteKit pane
+        // (so it doesn't appear in SuiteHost.registry, only here
+        // in the install catalog).
+        id: "seasick",
+        name: "Seasick",
+        tagline: "Motion cues for your Mac.",
+        category: .utilities,
+        channel: .github,
+        githubRepo: "Seasick",
+        url: nil,
+        bundleName: "Seasick",
+        iconAsset: "seasick"
+    ),
+    CatalogApp(
         id: "diane",
         name: "Diane",
         tagline: "I'm holding in my hand a small tape recorder.",
