@@ -97,6 +97,22 @@ let CATALOG: [CatalogApp] = [
         iconAsset: "seasick"
     ),
     CatalogApp(
+        // Worktree — follows your editor focus and shows which git
+        // project + branch you're in, with one-click branch
+        // switching, worktree management, and a saved-projects
+        // list so you can manage branches on repos you aren't
+        // focused in. Standalone menu-bar agent like Seasick.
+        id: "worktree",
+        name: "Worktree",
+        tagline: "Your current git project + branch, always in the menu bar.",
+        category: .developerTools,
+        channel: .github,
+        githubRepo: "Worktree",
+        url: nil,
+        bundleName: "Worktree",
+        iconAsset: "worktree"
+    ),
+    CatalogApp(
         id: "diane",
         name: "Diane",
         tagline: "I'm holding in my hand a small tape recorder.",
