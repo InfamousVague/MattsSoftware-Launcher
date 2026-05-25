@@ -20,14 +20,17 @@ import SwiftUI
 struct MenuContentView: View {
     @EnvironmentObject private var state: AppState
 
-    /// 4 columns × 48pt icons fits the 340-wide popover (which now
+    /// 4 columns × 42pt icons fits the 340-wide popover (which
     /// matches every merged pane's width, so the launcher stays a
     /// single consistent size as the user switches tabs). Math:
-    /// 340 − 24 (horizontal padding) = 316 available; 4 cells at
-    /// min 68 + 3 gaps at 12 = 308, leaving an 8pt safety margin
-    /// before SwiftUI's adaptive layout would fall back to 3 cols.
+    /// 340 − 24 (horizontal padding) = 316 available; the macOS
+    /// ScrollView eats ~16pt for its scrollbar when "Show scroll
+    /// bars" is set to Always, leaving 300pt of true grid width.
+    /// 4 cells at min 62 + 3 gaps at 12 = 284 — 16pt of safety
+    /// margin even with the scrollbar showing, so the adaptive
+    /// layout doesn't fall back to 3 cols when content overflows.
     private let columns = [
-        GridItem(.adaptive(minimum: 68, maximum: 80),
+        GridItem(.adaptive(minimum: 62, maximum: 74),
                  spacing: 12, alignment: .top)
     ]
 
@@ -42,8 +45,9 @@ struct MenuContentView: View {
         // 340 to match every merged pane's intrinsic width — keeps
         // the launcher one consistent size across tab switches so
         // the popover doesn't visibly resize between APPS and the
-        // panes. Smaller cells (48pt icons, 68pt min cell) earn
-        // back the 4-column grid that used to need 380.
+        // panes. Smaller cells (42pt icons, 62pt min cell) earn
+        // back the 4-column grid that used to need 380, and they
+        // survive the scrollbar showing up under "Always" mode.
         .frame(width: 340, height: 540)
         .task {
             if state.statuses.isEmpty { await state.refresh() }
@@ -277,16 +281,16 @@ private struct AppTile: View {
                 .resizable()
                 .interpolation(.high)
                 .scaledToFit()
-                .frame(width: 48, height: 48)
+                .frame(width: 42, height: 42)
                 .clipShape(RoundedRectangle(
-                    cornerRadius: 11, style: .continuous))
+                    cornerRadius: 10, style: .continuous))
         } else {
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(Color.secondary.opacity(0.18))
-                .frame(width: 48, height: 48)
+                .frame(width: 42, height: 42)
                 .overlay(
                     Image(systemName: "app.dashed")
-                        .font(.system(size: 19))
+                        .font(.system(size: 17))
                         .foregroundStyle(.secondary))
         }
     }
@@ -377,7 +381,7 @@ private struct AppTile: View {
                 .foregroundStyle(.primary)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .frame(maxWidth: 68)
+                .frame(maxWidth: 62)
         }
         .contentShape(Rectangle())
         .onTapGesture { primaryTap() }
