@@ -36,7 +36,6 @@ APPS=(
   "StickyKeys|../stickykeys-swift|InfamousVague/StickyKeys"
   "Stats|../stats-swift|InfamousVague/Stats"
   "Uninstaller|../uninstaller-swift|InfamousVague/Uninstaller"
-  "Crumb|../crumb-swift|InfamousVague/Crumb"
   # Tap's macOS port lives in the cross-platform monorepo at
   # tap/macos/, not its own peer Swift package — point at the
   # subdir directly so suite.sh's bump/build/release dispatch
