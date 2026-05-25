@@ -119,6 +119,23 @@ let CATALOG: [CatalogApp] = [
         iconAsset: "stickykeys"
     ),
     CatalogApp(
+        // Crumb — file-provenance overlay. Quarantine xattr +
+        // Spotlight WhereFroms (certain signals) + FSEvents +
+        // frontmost-app capture (heuristic, clearly labelled in
+        // the popover). Filed under utilities — Quarantine
+        // covers downloads alone; Crumb is the everyday "where
+        // did this file come from" lookup.
+        id: "crumb",
+        name: "Crumb",
+        tagline: "Every file came from somewhere — Crumb shows where.",
+        category: .utilities,
+        channel: .github,
+        githubRepo: "Crumb",
+        url: nil,
+        bundleName: "Crumb",
+        iconAsset: "crumb"
+    ),
+    CatalogApp(
         id: "port",
         name: "Port",
         tagline: "Every open port on your Mac, one click away.",
