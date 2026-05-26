@@ -40,6 +40,7 @@ final class NotchHost: NSObject {
     /// Enables the feature: builds the panel + starts the
     /// coordinator. Idempotent.
     func enable() {
+        NSLog("[island] enable() called, isEnabled=\(isEnabled)")
         guard !isEnabled else { return }
         isEnabled = true
         rebuildPanel()
@@ -73,8 +74,12 @@ final class NotchHost: NSObject {
     private func rebuildPanel() {
         // Re-resolving the host screen each rebuild so an unplug
         // event doesn't leave us pinned to a screen that's gone.
-        guard let screen = NSScreen.main else { return }
+        guard let screen = NSScreen.main else {
+            NSLog("[island] rebuildPanel: no main screen, bailing")
+            return
+        }
         let layout = NotchLayout.resolve(for: screen)
+        NSLog("[island] layout: hasNotch=\(layout.hasNotch) notchTrailingX=\(layout.notchTrailingX) screenWidth=\(layout.screenWidth)")
 
         // Panel covers the full notch band horizontally but is
         // only ~160pt tall — enough room for the expanded pill to
@@ -91,9 +96,15 @@ final class NotchHost: NSObject {
         )
 
         if panel == nil {
+            // .nonactivatingPanel only — drop the .borderless because
+            // SwiftUI inside a borderless NSPanel can fail to draw if
+            // the contentView's initial layer isn't materialised (a
+            // long-standing macOS quirk). Without title styling but
+            // with nonactivating, the panel still has no chrome and
+            // doesn't steal focus.
             let p = NSPanel(
                 contentRect: panelRect,
-                styleMask: [.borderless, .nonactivatingPanel],
+                styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
                 backing: .buffered,
                 defer: false
             )
@@ -102,7 +113,11 @@ final class NotchHost: NSObject {
             p.hasShadow = false
             p.isMovable = false
             p.isFloatingPanel = true
-            p.level = .mainMenu          // ride at menu-bar z
+            // `.popUpMenu` sits above status-bar items (which also
+            // float at `.statusBar`/`.mainMenu` z) so a packed
+            // menu bar can't render *over* the pill. Still below
+            // `.modalPanel` so it never breaks modal stacking.
+            p.level = .popUpMenu
             p.collectionBehavior = [
                 .canJoinAllSpaces,
                 .stationary,
@@ -130,11 +145,28 @@ final class NotchHost: NSObject {
             let hc = NSHostingController(rootView: root)
             hc.view.wantsLayer = true
             hc.view.layer?.backgroundColor = NSColor.clear.cgColor
+            // Pin the host view's autoresizing so it matches the
+            // panel's content rect even when SwiftUI's intrinsic
+            // size collapses to zero (which it will, given the
+            // .frame(maxWidth: .infinity) we use to let the pill
+            // float-position inside a screen-wide canvas).
+            hc.view.autoresizingMask = [.width, .height]
             hostingController = hc
             panel?.contentViewController = hc
         }
 
+        // contentViewController sizing can shrink the window to
+        // the controller's intrinsic content size — which is zero
+        // for our infinity-framed SwiftUI root. Re-assert the
+        // panel frame AFTER the controller's been attached so it
+        // doesn't collapse. Also size the host view explicitly so
+        // SwiftUI has a real bounds to render against.
+        panel?.setFrame(panelRect, display: true, animate: false)
+        hostingController?.view.frame = NSRect(
+            origin: .zero, size: panelRect.size)
+
         panel?.orderFrontRegardless()
+        NSLog("[island] panel after orderFront: visible=\(panel?.isVisible ?? false) frame=\(panel?.frame ?? .zero) level=\(panel?.level.rawValue ?? 0) contentView=\(panel?.contentView?.frame ?? .zero)")
     }
 }
 

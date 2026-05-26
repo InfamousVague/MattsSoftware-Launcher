@@ -98,8 +98,10 @@ final class LiveActivityCoordinator {
             return $0.id < $1.id
         }
         // Only republish when something actually changed — keeps
-        // the SwiftUI invalidation graph quiet.
+        // the SwiftUI invalidation graph quiet AND the log
+        // signal-rich (only state-change events surface).
         if collected != activities {
+            NSLog("[island] activities changed: \(activities.count) → \(collected.count) (top=\(collected.first?.id ?? "—"))")
             activities = collected
         }
     }

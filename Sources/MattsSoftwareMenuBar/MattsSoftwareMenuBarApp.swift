@@ -202,14 +202,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate,
 
         // Absorb installed panes the user has set to "merged"
         // (default: merge everything we can find) before the first
-        // render so the switcher is populated immediately. `activate:
-        // false` means we discover + dlopen the panes (so the carousel
-        // knows their identity / ABI) but DO NOT call paneStart on
-        // them — none of the merged apps actually runs until the user
-        // explicitly opens it (carousel click, catalog Open, or
-        // launching the .app from /Applications).
+        // render so the switcher is populated immediately.
+        //
+        // `activate: true` means we *do* call paneStart on each
+        // merged pane up front — that's what lets the Dynamic
+        // Island poll real state from them without the user
+        // having to open each pane's tab first. Espresso's widget
+        // / Darwin-notification subscriptions, Peephole's cam/mic
+        // monitor, Alfred's idle catalog — all want to be live
+        // from launcher boot.
         host.loadPanes(mergedIDs: SuiteSettings.mergedIDs(),
-                       activate: false)
+                       activate: true)
 
         // Let the catalog's "Open" action skip the standalone bounce
         // for merged apps — jump straight to that tab in our switcher

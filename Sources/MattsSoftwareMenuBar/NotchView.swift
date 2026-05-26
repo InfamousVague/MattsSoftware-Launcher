@@ -23,12 +23,13 @@ struct NotchView: View {
     var screenWidth: CGFloat
 
     @State private var expanded: Bool = false
-    /// Suppress the open-on-launch flash: the window appears with
-    /// `activities` empty, slides in once a real one shows up.
-    @State private var hasContent: Bool = false
 
     private let pillHeight: CGFloat = 28
-    private let pillTopInset: CGFloat = 30  // sit just under menu bar
+    /// 40pt clears both the 24pt non-notched menu bar AND the
+    /// ~32–38pt notched-MacBook menu bar with margin. Closer than
+    /// that risks the pill's top edge being eaten by the menu-bar
+    /// band on notched displays.
+    private let pillTopInset: CGFloat = 40
     private let expandedHeight: CGFloat = 132
     private let expandedWidth: CGFloat = 360
 
@@ -53,11 +54,9 @@ struct NotchView: View {
                     .animation(.spring(response: 0.32,
                                         dampingFraction: 0.78),
                                value: top)
-                    .onAppear { hasContent = true }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .opacity(hasContent ? 1 : 0)
     }
 
     // MARK: Pill content
@@ -97,6 +96,14 @@ struct NotchView: View {
         .padding(.horizontal, 12)
         .frame(height: pillHeight)
         .background(Color.black, in: Capsule())
+        // Hairline outline in the tint colour so the pill is
+        // visible even against a black wallpaper / dark mode menu
+        // bar — without it the all-black pill on a dark surface
+        // can be impossible to spot.
+        .overlay(
+            Capsule()
+                .strokeBorder(a.tint.opacity(0.4), lineWidth: 1)
+        )
         .contentShape(Capsule())
         .onTapGesture {
             // Only expand when the pane actually gave us
