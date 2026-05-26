@@ -124,10 +124,16 @@ final class NotchHost: NSObject {
                 .fullScreenAuxiliary,
                 .ignoresCycle,
             ]
-            // Let clicks pass through to apps below for the empty
-            // regions of the panel; the pill itself re-asserts a
-            // contentShape so taps still register on it.
-            p.ignoresMouseEvents = false  // pill needs taps
+            // Click-through across the whole panel. The window
+            // spans the full screen width at menu-bar level — if
+            // it accepted clicks, it would swallow every menu bar
+            // and Control Center hit too. The trade-off is the
+            // pill is currently *display-only*; tap-to-expand needs
+            // custom hitTest geometry to land taps on the pill
+            // without claiming the rest of the menu bar band.
+            // Phase 2 brings it back; for v1 the indicator alone
+            // is the win and a broken menu bar is the dealbreaker.
+            p.ignoresMouseEvents = true
             p.hidesOnDeactivate = false
             panel = p
         } else {
