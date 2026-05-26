@@ -223,9 +223,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate,
             self.showPopover()
         }
 
-        // A merged pane (e.g. StickyKeys) may need a TCC permission
-        // bound to *this* process — prompt + guide a relaunch if so.
-        AccessibilityGate.ensureIfNeeded(mergedIDs: SuiteSettings.mergedIDs())
+        // Accessibility prompt is intentionally NOT shown on launch.
+        // Some merged panes (StickyKeys) need AX permission bound to
+        // this process, but the modal nag-on-every-boot was worse
+        // than the silent fail — users who need it can grant it via
+        // System Settings → Privacy & Security → Accessibility.
 
         popover.behavior = .transient
         popover.animates = true
