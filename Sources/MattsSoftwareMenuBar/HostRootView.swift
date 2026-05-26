@@ -57,7 +57,21 @@ struct HostRootView: View {
                             // so there's never any doubt which view
                             // you're looking at; needs-update keeps
                             // its small orange dot beside the label.
+                            // The built-in APPS tab gets a small
+                            // square-grid glyph to its left so it
+                            // reads at a glance as the "catalog"
+                            // tab among the per-app feature panes.
                             HStack(spacing: 4) {
+                                if e.id == "apps" {
+                                    Image(systemName: "square.grid.2x2")
+                                        .font(.system(size: 10,
+                                                      weight: on
+                                                      ? .semibold
+                                                      : .medium))
+                                        .foregroundStyle(on
+                                            ? Color.white
+                                            : Color.secondary)
+                                }
                                 Text(e.title)
                                     .font(.system(
                                         size: 11,
