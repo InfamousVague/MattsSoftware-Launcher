@@ -7,6 +7,16 @@ import SwiftUI
 /// and adds/removes the pane).
 struct SuiteSettingsView: View {
     let host: SuiteHost
+    /// Lazily read on first render so the toggle reflects whatever
+    /// the user previously chose; updates synchronously when they
+    /// flip it and propagates to `MattsSoftwareMenuBarApp.notchHost`
+    /// via the binding.
+    @State private var dynamicIslandOn: Bool
+        = SuiteSettings.dynamicIslandEnabled()
+
+    init(host: SuiteHost) {
+        self.host = host
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -14,6 +24,8 @@ struct SuiteSettingsView: View {
             Divider()
             ScrollView {
                 LazyVStack(spacing: 0) {
+                    dynamicIslandRow
+                    Divider().opacity(0.4)
                     ForEach(SuiteHost.registry) { app in
                         row(app)
                         Divider().opacity(0.4)
@@ -25,6 +37,43 @@ struct SuiteSettingsView: View {
             footer
         }
         .frame(width: 340, height: 540)
+    }
+
+    /// Top row in the settings list — toggles the notch-pinned
+    /// pill on/off. Lives above the per-app merge rows because
+    /// it's a launcher-wide preference, not per-app.
+    private var dynamicIslandRow: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Dynamic Island")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("Pill near the notch for live activities")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Toggle("", isOn: Binding(
+                get: { dynamicIslandOn },
+                set: { on in
+                    dynamicIslandOn = on
+                    SuiteSettings.setDynamicIslandEnabled(on)
+                    // Reach into the app delegate to flip the
+                    // host live without a relaunch. The delegate
+                    // owns the lazy `notchHost`; toggling here
+                    // enables or tears it down immediately.
+                    if let d = NSApp.delegate as? AppDelegate {
+                        if on { d.notchHost.enable() }
+                        else { d.notchHost.disable() }
+                    }
+                }
+            ))
+            .toggleStyle(.switch)
+            .labelsHidden()
+            .controlSize(.small)
+            .fixedSize()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
     }
 
     private var header: some View {

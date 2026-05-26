@@ -155,6 +155,15 @@ final class SuiteHost {
         }.sorted { $0.id < $1.id }
     }
 
+    /// All loaded ABI-OK panes paired with their pane id. The
+    /// LiveActivity coordinator polls this list at ~1 Hz to
+    /// collect each pane's `paneLiveActivity()` payload.
+    var loadedPanes: [(id: String, pane: SuitePane)] {
+        cache.compactMap { (id, l) in
+            l.abiOK ? (id, l.pane) : nil
+        }
+    }
+
     /// A pane that's been dlopen'd at least once. Reused on rebuild
     /// so toggling merge on/off never re-`dlopen`s or double-starts.
     private struct Loaded {

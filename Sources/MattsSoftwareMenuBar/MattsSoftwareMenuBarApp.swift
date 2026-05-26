@@ -175,6 +175,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate,
 {
     let state = AppState()
     let host = SuiteHost()
+    private(set) lazy var notchHost = NotchHost(suiteHost: host)
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
     /// Global click monitor used to dismiss the popover on any click
@@ -248,6 +249,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate,
         // Watch /Applications so a newly-installed app appears in
         // the switcher without a launcher relaunch.
         startAppsWatcher()
+
+        // Dynamic Island pill — on by default. Lives independent
+        // of the popover; renders at the top of the main screen
+        // and animates as merged panes publish live activities.
+        if SuiteSettings.dynamicIslandEnabled() {
+            notchHost.enable()
+        }
     }
 
     // MARK: - Live switcher reactions
