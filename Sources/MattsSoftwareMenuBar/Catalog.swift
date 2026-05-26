@@ -113,6 +113,22 @@ let CATALOG: [CatalogApp] = [
         iconAsset: "worktree"
     ),
     CatalogApp(
+        // Halo — Dynamic Island for the MacBook notch. Standalone
+        // agent that hosts a single shape hanging from the screen
+        // top and reads suite-wide live-activity payloads from
+        // ~/Library/Application Support/MattsSoftware/live-activity.
+        // Espresso, Worktree, and any other publisher show up here.
+        id: "halo",
+        name: "Halo",
+        tagline: "Dynamic Island for your MacBook notch — every suite app's live activity.",
+        category: .utilities,
+        channel: .github,
+        githubRepo: "Halo",
+        url: nil,
+        bundleName: "Halo",
+        iconAsset: "halo"
+    ),
+    CatalogApp(
         id: "diane",
         name: "Diane",
         tagline: "I'm holding in my hand a small tape recorder.",

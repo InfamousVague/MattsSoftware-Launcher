@@ -22,24 +22,4 @@ enum SuiteSettings {
     static func setStandalone(_ id: String, _ standalone: Bool) {
         SuiteGuard.setMerged(id, !standalone)
     }
-
-    // MARK: - Dynamic Island
-
-    /// UserDefaults key for the notch-pinned live-activity pill
-    /// (the "Dynamic Island" feature). On by default — users who
-    /// don't want it toggle it off in launcher settings.
-    private static let dynamicIslandKey = "suite.dynamicIsland.enabled"
-
-    static func dynamicIslandEnabled() -> Bool {
-        let d = UserDefaults.standard
-        // Treat absence as "true" so first launch shows the
-        // feature; once the user toggles it the explicit value
-        // sticks.
-        if d.object(forKey: dynamicIslandKey) == nil { return true }
-        return d.bool(forKey: dynamicIslandKey)
-    }
-
-    static func setDynamicIslandEnabled(_ on: Bool) {
-        UserDefaults.standard.set(on, forKey: dynamicIslandKey)
-    }
 }
