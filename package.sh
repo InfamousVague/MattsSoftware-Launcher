@@ -48,14 +48,21 @@ cp "$BIN_DIR/libSuiteKit.dylib" "$APP/Contents/Frameworks/"
 install_name_tool -add_rpath @executable_path/../Frameworks \
   "$APP/Contents/MacOS/$BIN_NAME" 2>/dev/null || true
 
-# Row icons: copy the source PNGs straight into Contents/Resources
-# so the app loads them via Bundle.main. We deliberately do NOT use
-# SwiftPM's resource bundle — its generated Bundle.module accessor
-# fatalErrors when the bundle isn't found, and in a hand-assembled
-# .app it only ever resolved via a hardcoded dev `.build` path, so
-# the app crashed on first popover render on every other machine.
+# Row icons + hover-preview videos: copy straight into
+# Contents/Resources so the app loads them via Bundle.main. We
+# deliberately do NOT use SwiftPM's resource bundle — its
+# generated Bundle.module accessor fatalErrors when the bundle
+# isn't found, and in a hand-assembled .app it only ever resolved
+# via a hardcoded dev `.build` path, so the app crashed on first
+# popover render on every other machine.
 cp Sources/MattsSoftwareMenuBar/Resources/*.png \
    "$APP/Contents/Resources/"
+# anim-<icon>.mp4 — hover preview clips. AppTile looks them up by
+# bundle URL with the exact name pattern; missing video = silent
+# fallback to static icon, so adding new ones is a drop-in.
+for v in Sources/MattsSoftwareMenuBar/Resources/anim-*.mp4; do
+  [ -f "$v" ] && cp "$v" "$APP/Contents/Resources/"
+done
 
 # The MattsSoftware mark in Finder / Login Items / the about box.
 if [ -f "icon.icns" ]; then

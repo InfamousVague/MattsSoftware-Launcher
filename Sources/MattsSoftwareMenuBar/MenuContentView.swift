@@ -20,18 +20,18 @@ import SwiftUI
 struct MenuContentView: View {
     @EnvironmentObject private var state: AppState
 
-    /// 4 columns × 42pt icons fits the 340-wide popover (which
-    /// matches every merged pane's width, so the launcher stays a
-    /// single consistent size as the user switches tabs). Math:
-    /// 340 − 24 (horizontal padding) = 316 available; the macOS
-    /// ScrollView eats ~16pt for its scrollbar when "Show scroll
-    /// bars" is set to Always, leaving 300pt of true grid width.
-    /// 4 cells at min 62 + 3 gaps at 12 = 284 — 16pt of safety
-    /// margin even with the scrollbar showing, so the adaptive
-    /// layout doesn't fall back to 3 cols when content overflows.
+    /// 4 columns × 54pt icons in the 340-wide popover. Math:
+    /// 340 − 16 (section padding) − 16 (scrollbar under
+    /// "Always" mode) = 308 of true grid width. 4 cells at
+    /// min 72 + 3 gaps at 6 = 306 — 2pt of safety margin with
+    /// the scrollbar showing. Without the scrollbar, the cells
+    /// expand to fill (308 + 16 = 324 ÷ 4 ≈ 76pt each), well
+    /// inside the [72, 82] band the adaptive layout picks
+    /// through. Less padding + bigger icons = more room for
+    /// the hover-video preview.
     private let columns = [
-        GridItem(.adaptive(minimum: 62, maximum: 74),
-                 spacing: 12, alignment: .top)
+        GridItem(.adaptive(minimum: 72, maximum: 82),
+                 spacing: 6, alignment: .top)
     ]
 
     var body: some View {
@@ -160,13 +160,13 @@ struct MenuContentView: View {
     }
 
     private func gridSection(_ apps: [CatalogApp]) -> some View {
-        LazyVGrid(columns: columns, spacing: 14) {
+        LazyVGrid(columns: columns, spacing: 10) {
             ForEach(apps) { app in
                 AppTile(app: app)
                     .environmentObject(state)
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 8)
         .padding(.vertical, 12)
     }
 
@@ -235,6 +235,14 @@ struct MenuContentView: View {
 private struct AppTile: View {
     let app: CatalogApp
     @EnvironmentObject private var state: AppState
+    /// True while the cursor is over this tile's icon. Flips the
+    /// hover-video on; the player rewinds + plays from frame
+    /// zero each time this transitions true.
+    @State private var isHovering = false
+    /// Latches true when the video reaches its last frame so the
+    /// crossfade-out plays even though the cursor is still hovering.
+    /// Reset whenever a new hover begins.
+    @State private var videoFinished = false
 
     private var status: AppStatus? { state.statuses[app.id] }
     private var busyMsg: String? { state.busy[app.id] }
@@ -275,24 +283,41 @@ private struct AppTile: View {
         return "https://github.com/\(full)/releases"
     }
 
+    /// Icon edge size. Bumped from 42pt to 54pt — the grid now
+    /// gives each cell 72-82pt of horizontal room, so the icon
+    /// can grow without crowding the per-app label below.
+    private static let iconSize: CGFloat = 54
+    /// Squircle corner radius for both the static icon and the
+    /// video crop. ~22% of the icon edge so it matches macOS app
+    /// icon styling at this size.
+    private static let iconRadius: CGFloat = 12
+
     @ViewBuilder private var icon: some View {
         if let img = Services.appIcon(app.iconAsset) {
             Image(nsImage: img)
                 .resizable()
                 .interpolation(.high)
                 .scaledToFit()
-                .frame(width: 42, height: 42)
+                .frame(width: Self.iconSize, height: Self.iconSize)
                 .clipShape(RoundedRectangle(
-                    cornerRadius: 10, style: .continuous))
+                    cornerRadius: Self.iconRadius,
+                    style: .continuous))
         } else {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: Self.iconRadius,
+                             style: .continuous)
                 .fill(Color.secondary.opacity(0.18))
-                .frame(width: 42, height: 42)
+                .frame(width: Self.iconSize, height: Self.iconSize)
                 .overlay(
                     Image(systemName: "app.dashed")
-                        .font(.system(size: 17))
+                        .font(.system(size: 22))
                         .foregroundStyle(.secondary))
         }
+    }
+
+    /// Video URL for this app's hover preview, or nil if no
+    /// `anim-<iconAsset>.mp4` is bundled.
+    private var hoverVideoURL: URL? {
+        HoverVideoCatalog.url(forIcon: app.iconAsset)
     }
 
     /// Tiny iconographic badge in the top-right corner of the icon.
@@ -368,11 +393,53 @@ private struct AppTile: View {
         }
     }
 
+    /// Crossfade rule: the static icon sits underneath at full
+    /// opacity always. The video overlay is on top and fades in
+    /// only while the cursor is over the tile AND the clip hasn't
+    /// played through yet. When the AVPlayer fires its end
+    /// notification, `videoFinished` flips true → overlay opacity
+    /// animates back to 0 → static icon appears underneath. Same
+    /// behaviour on early hover-out.
+    private var videoOverlayActive: Bool {
+        isHovering && !videoFinished && hoverVideoURL != nil
+    }
+
     var body: some View {
         VStack(spacing: 4) {
             ZStack(alignment: .topTrailing) {
+                // Static icon — always present underneath so the
+                // crossfade from video → icon is just the video's
+                // opacity dropping.
                 icon
                     .opacity(isInstalled || isWorking ? 1 : 0.92)
+
+                // Hover-video overlay. Built only when a bundled
+                // `anim-<id>.mp4` exists; otherwise the tile
+                // renders as it always did. AVPlayer instance is
+                // retained inside the NSViewRepresentable so its
+                // first hover doesn't pay decoding setup latency.
+                if let url = hoverVideoURL {
+                    HoverVideoPlayer(
+                        url: url,
+                        isPlaying: videoOverlayActive,
+                        onEnd: {
+                            // Player paused on the last frame
+                            // (actionAtItemEnd = .pause); the
+                            // crossfade out happens here.
+                            videoFinished = true
+                        })
+                        .frame(width: Self.iconSize,
+                               height: Self.iconSize)
+                        .clipShape(RoundedRectangle(
+                            cornerRadius: Self.iconRadius,
+                            style: .continuous))
+                        .opacity(videoOverlayActive ? 1 : 0)
+                        .animation(
+                            .easeInOut(duration: 0.35),
+                            value: videoOverlayActive)
+                        .allowsHitTesting(false)
+                }
+
                 statusBadge
                     .offset(x: 4, y: -4)
             }
@@ -381,9 +448,19 @@ private struct AppTile: View {
                 .foregroundStyle(.primary)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .frame(maxWidth: 62)
+                .frame(maxWidth: 72)
         }
         .contentShape(Rectangle())
+        .onHover { hovering in
+            if hovering {
+                // Fresh hover → reset the played-through latch
+                // BEFORE the player starts so the overlay's
+                // opacity binding evaluates as active on the
+                // same frame the AVPlayer rewinds + plays.
+                videoFinished = false
+            }
+            isHovering = hovering
+        }
         .onTapGesture { primaryTap() }
         .contextMenu { menuItems }
         .help(busyMsg ?? app.tagline)
