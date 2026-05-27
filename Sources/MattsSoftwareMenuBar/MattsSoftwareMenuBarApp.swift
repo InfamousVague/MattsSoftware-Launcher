@@ -289,6 +289,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate,
                 self.showPopover()
             }
         }
+
+        // didLaunchApplication only fires for NEW launches — anything
+        // already running when the launcher boots stays invisible to
+        // the carousel until it quits + relaunches. That's a common
+        // case for suite apps set as login items (Alfred, Peephole,
+        // Espresso, etc.): they boot at the same time as the launcher
+        // and slip past the observer. Walk runningApplications once
+        // at startup and absorb every merged-registry match the same
+        // way a live launch would. `openMerged` is idempotent (no-op
+        // when the pane is already started), so the live observer
+        // above stays safe.
+        absorbAlreadyRunningSuiteApps()
+    }
+
+    private func absorbAlreadyRunningSuiteApps() {
+        for r in NSWorkspace.shared.runningApplications {
+            guard let bid = r.bundleIdentifier,
+                  bid != "com.mattssoftware.launcher",
+                  let entry = SuiteHost.registry.first(where: {
+                      $0.bundleID == bid
+                  }),
+                  !SuiteSettings.isStandalone(entry.id)
+            else { continue }
+            let paneID = entry.id
+            Task { @MainActor in
+                self.host.openMerged(paneID)
+            }
+        }
     }
 
     private func startAppsWatcher() {
